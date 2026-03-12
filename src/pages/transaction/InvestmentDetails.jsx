@@ -818,7 +818,7 @@ const InvestmentDetails = () => {
                 name="remarks"
                 value={formData.remarks}
                 onChange={handleChange}
-                placeholder="Enter remarks or use voice input (தமிழ்/EN)"
+                placeholder="Enter remarks (தமிழ்/EN)"
                 rows={3}
                 error={errors.remarks}
                 showToast={showToast}

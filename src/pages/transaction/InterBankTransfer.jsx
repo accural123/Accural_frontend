@@ -983,7 +983,7 @@ const InterBankTransfer = () => {
                 name="description"
                 value={formData.description}
                 onChange={handleChange}
-                placeholder="Enter description or use voice input (தமிழ்/EN)"
+                placeholder="Enter description (தமிழ்/EN)"
                 rows={3}
              
                 showToast={showToast}
