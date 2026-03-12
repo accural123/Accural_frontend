@@ -32,6 +32,7 @@ const OpeningBalance = () => {
   const [ledgers, setLedgers] = useState([]);
   const [savedOpeningBalances, setSavedOpeningBalances] = useState([]);
   const [editingEntryId, setEditingEntryId] = useState(null);
+  const [editingSavedId, setEditingSavedId] = useState(null);
   const [showSavedBalances, setShowSavedBalances] = useState(false);
 
   const { executeApi, loading, error, clearError } = useApiService();
@@ -297,22 +298,54 @@ const OpeningBalance = () => {
       status: 'Active'
     };
     
-    const result = await executeApi(openingBalanceService.create, openingBalanceData);
-    
+    const result = editingSavedId
+      ? await executeApi(openingBalanceService.update, editingSavedId, openingBalanceData)
+      : await executeApi(openingBalanceService.create, openingBalanceData);
+
     if (result.success) {
-      // Close any open dialogs
       if (dialogState.isOpen) closeDialog();
-      
-      // Show success toast
-      showToast(`Opening Balance saved successfully! Status: ${isBalanced ? 'Balanced' : 'Unbalanced'}`, 'success');
-      
-      // Reset form
+      showToast(`Opening Balance ${editingSavedId ? 'updated' : 'saved'} successfully!`, 'success');
       setOpeningBalanceDetails([]);
+      setEditingSavedId(null);
       resetCurrentEntry();
       await loadSavedOpeningBalances();
     } else {
       if (dialogState.isOpen) closeDialog();
       showToast(result.message || 'Failed to save opening balance', 'error');
+    }
+  };
+
+  const handleEditSaved = (balance) => {
+    setCurrentEntry({
+      ledgerCode: balance.accountCode || '',
+      ledgerHead: balance.accountHead || '',
+      amount: String(balance.amount || '')
+    });
+    setBalanceType(balance.type || 'Debit');
+    setEditingSavedId(balance.id);
+    setShowSavedBalances(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleDeleteSaved = async (balance) => {
+    const confirmed = await showConfirmDialog({
+      title: 'Delete Opening Balance',
+      message: `Are you sure you want to delete the ${balance.type} entry for "${balance.accountHead}"?`,
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      type: 'error'
+    });
+    if (confirmed) {
+      const result = await executeApi(openingBalanceService.delete, balance.id);
+      closeDialog();
+      if (result.success) {
+        showToast('Opening balance deleted successfully!', 'success');
+        await loadSavedOpeningBalances();
+      } else {
+        showToast(result.message || 'Failed to delete', 'error');
+      }
+    } else {
+      closeDialog();
     }
   };
 
@@ -412,6 +445,7 @@ const OpeningBalance = () => {
                       <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Amount</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Financial Year</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Date</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white/40 divide-y divide-slate-200">
@@ -432,6 +466,10 @@ const OpeningBalance = () => {
                         <td className="px-6 py-4 text-sm text-slate-500">{balance.financialYear || '-'}</td>
                         <td className="px-6 py-4 text-sm text-slate-500">
                           {balance.createdDate ? new Date(balance.createdDate).toLocaleDateString() : '-'}
+                        </td>
+                        <td className="px-6 py-4 text-sm font-medium space-x-3">
+                          <button onClick={() => handleEditSaved(balance)} className="text-blue-600 hover:text-blue-900">Edit</button>
+                          <button onClick={() => handleDeleteSaved(balance)} className="text-red-600 hover:text-red-900">Delete</button>
                         </td>
                       </tr>
                     ))}

@@ -1,6 +1,33 @@
 
 import { useState, useCallback, useRef } from 'react';
 
+const parseErrorMessage = (message) => {
+  if (!message) return 'An unexpected error occurred';
+  const m = String(message);
+
+  if (m.includes('duplicate key') || m.includes('unique constraint'))
+    return 'A record with this information already exists.';
+  if (m.includes('foreign key constraint'))
+    return 'This record is linked to other data and cannot be deleted.';
+  if (m.includes('Could not find') && m.includes('column'))
+    return 'Database configuration error. Please contact support.';
+  if (m.includes('not null violation'))
+    return 'Required information is missing.';
+  if (m.includes('JWT') || m.includes('token expired'))
+    return 'Session expired. Please login again.';
+  if (m.includes('permission denied'))
+    return 'You do not have permission to perform this action.';
+
+  // Extract from Python dict-style: {'message': "..."}
+  const dictMatch = m.match(/'message':\s*["']([^"']+)["']/);
+  if (dictMatch) return 'Operation failed. Please try again.';
+
+  if (m.length > 120 && (m.includes('{') || m.includes('Error:')))
+    return 'Operation failed. Please try again.';
+
+  return m;
+};
+
 export const useApiService = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -33,17 +60,11 @@ export const useApiService = () => {
       }
       
       if (!result.success) {
-        setError(result.message);
+        console.error('API Error:', { message: result.message, status: result.status, timestamp: new Date().toISOString() });
+        const friendly = parseErrorMessage(result.message);
+        setError(friendly);
         setData(null);
-        
-        // Log for debugging in accounting context
-        console.error('API Error:', {
-          message: result.message,
-          status: result.status,
-          timestamp: new Date().toISOString()
-        });
-        
-        return result;
+        return { ...result, message: friendly };
       }
       
       setData(result.data);
@@ -61,21 +82,11 @@ export const useApiService = () => {
       }
 
       const errorMessage = err.message || 'An unexpected error occurred';
-      setError(errorMessage);
+      console.error('API Exception:', { error: errorMessage, stack: err.stack, timestamp: new Date().toISOString() });
+      const friendly = parseErrorMessage(errorMessage);
+      setError(friendly);
       setData(null);
-      
-      // Critical logging for accounting operations
-      console.error('API Exception:', {
-        error: errorMessage,
-        stack: err.stack,
-        timestamp: new Date().toISOString()
-      });
-      
-      return {
-        success: false,
-        data: null,
-        message: errorMessage
-      };
+      return { success: false, data: null, message: friendly };
     } finally {
       setLoading(false);
       abortControllerRef.current = null;

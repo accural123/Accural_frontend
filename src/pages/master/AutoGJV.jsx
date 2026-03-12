@@ -22,6 +22,7 @@ const AutoGJV = () => {
   const [savedConfigurations, setSavedConfigurations] = useState([]);
   const [showSavedConfigs, setShowSavedConfigs] = useState(false);
   const [editingEntryId, setEditingEntryId] = useState(null);
+  const [editingSavedConfigId, setEditingSavedConfigId] = useState(null);
   const [currentEntry, setCurrentEntry] = useState({
     particulars: '',
     debitAccount: '',
@@ -320,17 +321,16 @@ const deleteEntry = async (entry) => {
       description: `Auto GJV configuration for ${selectedGJVType}`
     };
     
-    const result = await executeApi(autoGjvService.create, configurationData);
-    
+    const result = editingSavedConfigId
+      ? await executeApi(autoGjvService.update, editingSavedConfigId, configurationData)
+      : await executeApi(autoGjvService.create, configurationData);
+
     if (result.success) {
-      showToast(`${selectedGJVType} configuration saved successfully!`, 'success');
-      
-      // Reset form
+      showToast(`${selectedGJVType} configuration ${editingSavedConfigId ? 'updated' : 'saved'} successfully!`, 'success');
       setGjvEntries([]);
       resetCurrentEntry();
       setSelectedGJVType('');
-      
-      // Reload saved configurations
+      setEditingSavedConfigId(null);
       await loadSavedConfigurations();
     } else {
       showToast(result.message || 'Failed to save configuration', 'error');
@@ -342,10 +342,33 @@ const deleteEntry = async (entry) => {
     if (result.success && result.data) {
       setSelectedGJVType(result.data.gjvType);
       setGjvEntries(result.data.entries || []);
+      setEditingSavedConfigId(configId);
       setShowSavedConfigs(false);
-      showToast('Configuration loaded successfully', 'success');
+      showToast('Configuration loaded for editing', 'success');
     } else {
       showToast('Failed to load configuration', 'error');
+    }
+  };
+
+  const handleDeleteConfig = async (config) => {
+    const confirmed = await showConfirmDialog({
+      title: 'Delete Configuration',
+      message: `Are you sure you want to delete the "${config.gjvType}" configuration?`,
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      type: 'error'
+    });
+    if (confirmed) {
+      const result = await executeApi(autoGjvService.delete, config.id);
+      closeDialog();
+      if (result.success) {
+        showToast('Configuration deleted successfully', 'success');
+        await loadSavedConfigurations();
+      } else {
+        showToast(result.message || 'Failed to delete', 'error');
+      }
+    } else {
+      closeDialog();
     }
   };
 
@@ -454,14 +477,9 @@ const deleteEntry = async (entry) => {
                           </span>
                         </td>
                         <td className="px-6 py-4 text-sm text-slate-500">{config.createdDate}</td>
-                        <td className="px-6 py-4 text-sm font-medium">
-                          <button
-                            onClick={() => loadConfiguration(config.id)}
-                            className="text-blue-600 hover:text-blue-900 mr-4"
-                            title="Load this configuration"
-                          >
-                            Load
-                          </button>
+                        <td className="px-6 py-4 text-sm font-medium space-x-3">
+                          <button onClick={() => loadConfiguration(config.id)} className="text-blue-600 hover:text-blue-900">Edit</button>
+                          <button onClick={() => handleDeleteConfig(config)} className="text-red-600 hover:text-red-900">Delete</button>
                         </td>
                       </tr>
                     ))}
