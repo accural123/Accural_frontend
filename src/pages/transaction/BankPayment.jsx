@@ -427,7 +427,7 @@ const handleSubmit = async () => {
           </h4>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* <FormField
+            <FormField
               label="In Favour Of"
               name="depositorName"
               value={formData.depositorName}
@@ -435,7 +435,7 @@ const handleSubmit = async () => {
               required
               placeholder="Enter depositor's name"
               icon={User}
-            /> */}
+            />
 
             <FormField
               label="Cheque/DD No"
