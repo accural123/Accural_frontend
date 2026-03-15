@@ -178,20 +178,7 @@ const deleteEntry = async (entry) => {
     }
   }
 };
-  // const deleteEntry = (entry) => {
-  //   if (window.confirm('Are you sure you want to delete this entry?')) {
-  //     setBalanceData(prev => {
-  //       const filtered = prev.filter(item => item.id !== entry.id);
-  //       return filtered.map((item, index) => ({ ...item, slNo: index + 1 }));
-  //     });
-  //     showToast('Entry deleted successfully', 'success');
-      
-  //     if (editingEntryId === entry.id) {
-  //       resetNewEntry();
-  //     }
-  //   }
-  // };
-
+ 
   const editEntry = (entry) => {
     setNewEntry({
       year: entry.year,
@@ -290,17 +277,7 @@ const handleDeleteRecord = async (id) => {
     }
   }
 };
-  // const handleDeleteRecord = async (id) => {
-  //   if (window.confirm('Are you sure you want to delete this yearwise balance record?')) {
-  //     const result = await executeApi(yearwiseBalanceService.delete, id);
-  //     if (result.success) {
-  //       showToast(result.message || 'Record deleted successfully!', 'success');
-  //       await loadSavedRecords();
-  //     } else {
-  //       showToast(result.message || 'Failed to delete record!', 'error');
-  //     }
-  //   }
-  // };
+
 
   const handleSearch = async () => {
     if (searchTerm.trim()) {

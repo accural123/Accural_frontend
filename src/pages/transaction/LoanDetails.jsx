@@ -353,17 +353,7 @@ const handleDelete = async (id) => {
     }
   }
 };
-  // const handleDelete = async (id) => {
-  //   if (window.confirm('Are you sure you want to delete this loan?')) {
-  //     const result = await executeApi(loanService.delete, id);
-  //     if (result.success) {
-  //       showToast(result.message || 'Loan deleted successfully!', 'success');
-  //       await loadLoans();
-  //     } else {
-  //       showToast(result.message || 'Failed to delete loan!', 'error');
-  //     }
-  //   }
-  // };
+
 
   const filteredLoans = loans.filter(loan =>
     loan.loanSerialNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||

@@ -325,17 +325,7 @@ const handleDelete = async (id) => {
     }
   }
 };
-  // const handleDelete = async (id) => {
-  //   if (window.confirm('Are you sure you want to delete this ledger?')) {
-  //     const result = await executeApi(ledgerService.delete, id);
-  //     if (result.success) {
-  //       showToast(result.message || 'Ledger deleted successfully!', 'success');
-  //       await loadLedgers();
-  //     } else {
-  //       showToast(result.message || 'Failed to delete ledger!', 'error');
-  //     }
-  //   }
-  // };
+ 
 
   const handleSearch = async () => {
     if (searchTerm.trim()) {

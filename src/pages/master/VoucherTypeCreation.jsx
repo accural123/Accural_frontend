@@ -247,17 +247,7 @@ const VoucherTypeCreation = () => {
   }
 };
 
-  // const handleDelete = async (id) => {
-  //   if (window.confirm('Are you sure you want to delete this voucher type?')) {
-  //     const result = await executeApi(voucherTypeService.delete, id);
-  //     if (result.success) {
-  //       showToast(result.message || 'Voucher type deleted successfully!', 'success');
-  //       await loadVoucherTypes();
-  //     } else {
-  //       showToast(result.message || 'Failed to delete voucher type!', 'error');
-  //     }
-  //   }
-  // };
+  
 
   const handleSearch = async () => {
     if (searchTerm.trim()) {
