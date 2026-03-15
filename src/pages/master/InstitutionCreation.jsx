@@ -801,7 +801,7 @@ const handleDelete = async (id) => {
               <table className="w-full">
                 <thead className="bg-slate-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Institution ID</th>
+                    {/* <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Institution ID</th> */}
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Institution</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Location</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Local Body</th>
@@ -816,9 +816,9 @@ const handleDelete = async (id) => {
                 <tbody className="bg-white/40 divide-y divide-slate-200">
                   {filteredInstitutions.map((institution) => (
                     <tr key={institution.id} className="hover:bg-white/60 transition-colors">
-                      <td className="px-6 py-4">
+                      {/* <td className="px-6 py-4">
                         <div className="text-sm font-medium text-slate-900">{institution.institutionId}</div>
-                      </td>
+                      </td> */}
                       <td className="px-6 py-4">
                         <div>
                           <div className="text-sm font-medium text-slate-900">{institution.institutionName}</div>
