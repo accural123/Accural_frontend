@@ -624,7 +624,7 @@ const LedgerCreation = () => {
   // Convert real groups to SearchableDropdown format
   const groupOptions = groups.map(group => ({
     value: group.groupName || group.name,
-    label: group.groupName || group.name,
+    label: group.groupCode ? `${group.groupName || group.name} (${group.groupCode})` : (group.groupName || group.name),
     description: group.underMainGroup || ''
   }));
 

@@ -179,37 +179,26 @@ const FundInstitutionAllocation = () => {
     setSubmitLoading(true);
 
     try {
-      const newAllocation = {
-        ...allocationForm,
-        id: editingAllocation ? editingAllocation.id : allocationForm.userId,
-        createdAt: editingAllocation ? editingAllocation.createdAt : new Date().toISOString().split('T')[0],
-        createdBy: 'admin'
-      };
-
-      let updatedAllocations;
-      if (editingAllocation) {
-        updatedAllocations = allocations.map(alloc => 
-          alloc.id === editingAllocation.id ? newAllocation : alloc
-        );
-        showToast('Allocation updated successfully!', 'success');
-      } else {
-        updatedAllocations = [...allocations, newAllocation];
-        showToast('Allocation created successfully!', 'success');
-      }
-
-      // Save via real API
       let result;
       if (editingAllocation) {
-        result = await fundAllocationService.create(newAllocation); // update if API supports it
+        result = await fundAllocationService.update(editingAllocation.id, allocationForm);
       } else {
+        const newAllocation = {
+          ...allocationForm,
+          createdAt: new Date().toISOString().split('T')[0],
+          createdBy: 'admin'
+        };
         result = await fundAllocationService.create(newAllocation);
       }
-      if (result.success) {
-        setAllocations(updatedAllocations);
-      }
 
-      setShowAllocationModal(false);
-      resetForm();
+      if (result.success) {
+        showToast(editingAllocation ? 'Allocation updated successfully!' : 'Allocation created successfully!', 'success');
+        await loadAllData();
+        setShowAllocationModal(false);
+        resetForm();
+      } else {
+        showToast(result.message || 'Failed to save allocation. Please try again.', 'error');
+      }
     } catch (error) {
       console.error('Error saving allocation:', error);
       showToast('Error saving allocation. Please try again.', 'error');
@@ -349,7 +338,7 @@ const FundInstitutionAllocation = () => {
     }
   };
 
-  const AllocationModal = () => (
+  const allocationModalContent = (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg w-full max-w-4xl max-h-screen overflow-y-auto">
         <div className="bg-gradient-to-r from-blue-500 to-purple-500 px-6 py-4">
@@ -803,7 +792,7 @@ const FundInstitutionAllocation = () => {
   loading={dialogState.loading}
 />
       {/* Allocation Modal */}
-      {showAllocationModal && <AllocationModal />}
+      {showAllocationModal && allocationModalContent}
     </div>
   );
 };

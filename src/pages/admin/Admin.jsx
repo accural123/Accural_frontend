@@ -123,16 +123,20 @@ const Admin = () => {
     }
   };
 
-  const handleToggleUserStatus = (userId) => {
-    setUsers(users.map(user => 
-      user.id === userId 
-        ? { 
-            ...user, 
-            status: user.status === 'Active' ? 'Inactive' : 'Active',
-            lastStatusChange: new Date().toLocaleString()
-          }
-        : user
-    ));
+  const handleToggleUserStatus = async (userId) => {
+    const user = users.find(u => u.id === userId);
+    if (!user) return;
+    const newIsActive = user.status === 'Active' ? false : true;
+    try {
+      await authService.updateUser(userId, { is_active: newIsActive });
+      setUsers(users.map(u =>
+        u.id === userId
+          ? { ...u, status: newIsActive ? 'Active' : 'Inactive', lastStatusChange: new Date().toLocaleString() }
+          : u
+      ));
+    } catch (err) {
+      showToast('Failed to update user status', 'error');
+    }
   };
 
   const handleBulkActivate = () => {

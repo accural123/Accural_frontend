@@ -47,5 +47,6 @@ export { employeeService }       from './employeeService';
 export const fundAllocationService = {
   getAll:  (params) => apiClient.get('/fund-allocations', params),
   create:  (data)   => apiClient.post('/fund-allocations', data),
+  update:  (id, data) => apiClient.put(`/fund-allocations/${id}`, data),
   delete:  (id)     => apiClient.delete(`/fund-allocations/${id}`),
 };
