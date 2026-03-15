@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Search, Edit, Trash2, Eye, Plus, Save, Receipt, Settings, Hash } from 'lucide-react';
+import { FileText, Edit, Trash2, Eye, Plus, Save, Receipt, Settings, Hash } from 'lucide-react';
 import { Card } from "../../components/common/Card";
 import { FormField } from "../../components/common/FormField";
 import { VoiceInputField } from "../../components/common/VoiceInputField"; // Import VoiceInputField
@@ -10,7 +10,7 @@ import { voucherTypeService } from "../../services/realServices";
 import { useApiService } from "../../hooks/useApiService";
 import { ErrorDisplay } from '../../components/common/ErrorDisplay';
 import { ConfirmDialog, useConfirmDialog } from "../../components/common/Popup";
-import Pagination from '../../components/common/Pagination';
+import SearchableRecords from '../../components/common/SearchableRecords';
 import { useAuth } from '../../context/AuthContext';
 
 const ITEMS_PER_PAGE = 10;
@@ -36,9 +36,10 @@ const VoucherTypeCreation = () => {
   const [voucherTypes, setVoucherTypes] = useState([]);
   const [showTable, setShowTable] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchFilters, setSearchFilters] = useState({ searchTerm: '', voucherType: '' });
   const [submitLoading, setSubmitLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedIds, setSelectedIds] = useState(new Set());
 
   const { executeApi, loading, error, clearError } = useApiService();
 
@@ -249,28 +250,55 @@ const VoucherTypeCreation = () => {
 
   
 
-  const handleSearch = async () => {
-    if (searchTerm.trim()) {
-      const result = await executeApi(voucherTypeService.search, searchTerm);
-      if (result.success) {
-        setVoucherTypes(result.data || []);
-      }
-    } else {
-      await loadVoucherTypes();
-    }
-  };
-
-  const filteredVoucherTypes = voucherTypes.filter(vt =>
-    vt.voucherName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    vt.alias?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    vt.selectTypeOfVoucher?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredVoucherTypes = voucherTypes.filter(vt => {
+    const { searchTerm, voucherType } = searchFilters;
+    const matchesSearch = !searchTerm ||
+      vt.voucherName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      vt.alias?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      vt.selectTypeOfVoucher?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesType = !voucherType || vt.selectTypeOfVoucher === voucherType;
+    return matchesSearch && matchesType;
+  });
 
   const totalPages = Math.ceil(filteredVoucherTypes.length / ITEMS_PER_PAGE);
   const paginatedVoucherTypes = filteredVoucherTypes.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   );
+
+  const handleSelectAll = () => {
+    if (paginatedVoucherTypes.every(item => selectedIds.has(item.id))) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(paginatedVoucherTypes.map(item => item.id)));
+    }
+  };
+
+  const handleSelectItem = (id) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) { next.delete(id); } else { next.add(id); }
+    setSelectedIds(next);
+  };
+
+  const handleBulkDelete = async () => {
+    const confirmed = await showConfirmDialog({
+      title: 'Delete Selected',
+      message: `Are you sure you want to delete ${selectedIds.size} selected record(s)? This action cannot be undone.`,
+      confirmText: 'Delete All',
+      cancelText: 'Cancel',
+      type: 'error'
+    });
+    if (confirmed) {
+      let count = 0;
+      for (const id of selectedIds) {
+        const result = await executeApi(voucherTypeService.delete, id);
+        if (result.success) count++;
+      }
+      setSelectedIds(new Set());
+      await loadVoucherTypes();
+      showToast(`${count} record(s) deleted successfully!`, 'success');
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -412,34 +440,87 @@ const VoucherTypeCreation = () => {
       )}
 
       {showTable && (
-        <div className="bg-white/60 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200/60 overflow-hidden">
-          <div className="bg-gradient-to-r from-teal-500 to-cyan-500 px-6 py-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-white">Registered Voucher Types ({voucherTypes.length})</h2>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search voucher types..."
-                  value={searchTerm}
-                  onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                  className="pl-10 pr-4 py-2 bg-white/20 backdrop-blur-sm border border-white/30 rounded-lg text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/50"
-                />
+        <SearchableRecords
+          title="Registered Voucher Types"
+          totalRecords={filteredVoucherTypes.length}
+          searchFilters={searchFilters}
+          onFiltersChange={(f) => { setSearchFilters(f); setCurrentPage(1); }}
+          loading={loading}
+          gradientFrom="from-teal-500"
+          gradientTo="to-cyan-500"
+          searchPlaceholder="Search by voucher name, alias, or type..."
+          filterConfig={{ dateRange: false, amountRange: false, fromWhom: false, fundType: false, status: false, transactionMode: false }}
+          customFilters={[
+            {
+              key: 'voucherType',
+              label: 'Voucher Type',
+              type: 'select',
+              icon: Receipt,
+              options: [
+                { value: '', label: 'All Types' },
+                { value: 'Bank Receipt', label: 'Bank Receipt' },
+                { value: 'Bank Payment', label: 'Bank Payment' },
+                { value: 'Journal', label: 'Journal' },
+                { value: 'Daily Collection', label: 'Daily Collection' },
+                { value: 'Inter Bank Transfer', label: 'Inter Bank Transfer' },
+              ]
+            }
+          ]}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          pageSize={ITEMS_PER_PAGE}
+        >
+          {selectedIds.size > 0 && (
+            <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-4">
+              <span className="text-sm font-medium text-red-700">
+                {selectedIds.size} record(s) selected
+              </span>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setSelectedIds(new Set())}
+                  className="text-sm text-gray-600 hover:text-gray-900 px-3 py-1.5 border border-gray-300 rounded-lg bg-white"
+                >
+                  Clear
+                </button>
+                <button
+                  onClick={handleBulkDelete}
+                  className="flex items-center space-x-2 bg-red-600 hover:bg-red-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Delete Selected ({selectedIds.size})</span>
+                </button>
               </div>
             </div>
-          </div>
-          
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
-              <span className="ml-2 text-slate-600">Loading voucher types...</span>
+          )}
+          {filteredVoucherTypes.length === 0 ? (
+            <div className="text-center py-8">
+              <Receipt className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+              <p className="text-slate-500">
+                {searchFilters.searchTerm || searchFilters.voucherType ? 'No voucher types found matching your search.' : 'No voucher types created yet.'}
+              </p>
+              {!searchFilters.searchTerm && !searchFilters.voucherType && (
+                <button
+                  onClick={() => setShowTable(false)}
+                  className="text-teal-600 hover:text-teal-800 text-sm font-medium mt-2"
+                >
+                  Create your first voucher type →
+                </button>
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-slate-50">
                   <tr>
+                    <th className="px-4 py-3 w-10">
+                      <input
+                        type="checkbox"
+                        checked={paginatedVoucherTypes.length > 0 && paginatedVoucherTypes.every(item => selectedIds.has(item.id))}
+                        onChange={handleSelectAll}
+                        className="rounded"
+                      />
+                    </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Voucher Name</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Alias</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Type</th>
@@ -449,6 +530,14 @@ const VoucherTypeCreation = () => {
                 <tbody className="bg-white/40 divide-y divide-slate-200">
                   {paginatedVoucherTypes.map((voucherType) => (
                     <tr key={voucherType.id} className="hover:bg-white/60 transition-colors">
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(voucherType.id)}
+                          onChange={() => handleSelectItem(voucherType.id)}
+                          className="rounded"
+                        />
+                      </td>
                       <td className="px-6 py-4">
                         <div>
                           <div className="text-sm font-medium text-slate-900">{voucherType.voucherName}</div>
@@ -485,33 +574,7 @@ const VoucherTypeCreation = () => {
               </table>
             </div>
           )}
-          
-          {totalPages > 1 && (
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={setCurrentPage}
-              pageSize={ITEMS_PER_PAGE}
-            />
-          )}
-
-          {!loading && filteredVoucherTypes.length === 0 && (
-            <div className="text-center py-8">
-              <Receipt className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-              <p className="text-slate-500">
-                {searchTerm ? 'No voucher types found matching your search.' : 'No voucher types created yet.'}
-              </p>
-              {!searchTerm && (
-                <button
-                  onClick={() => setShowTable(false)}
-                  className="text-teal-600 hover:text-teal-800 text-sm font-medium mt-2"
-                >
-                  Create your first voucher type →
-                </button>
-              )}
-            </div>
-          )}
-        </div>
+        </SearchableRecords>
       )}
       <ConfirmDialog
   isOpen={dialogState.isOpen}

@@ -7,22 +7,27 @@ import { DataTable } from "../../components/common/DataTable";
 import SearchableDropdown from "../../components/common/SearchableDropdown"; // Import SearchableDropdown
 import { autoGjvService, accountService } from "../../services/realServices";
 import { useApiService } from "../../hooks/useApiService";
-import { Settings, Calendar, AlertCircle, CheckCircle, Plus, Save, RefreshCw, Eye, FileText, Hash, CreditCard, Clock } from 'lucide-react';
+import { Settings, Calendar, AlertCircle, CheckCircle, Plus, Save, RefreshCw, Eye, FileText, Hash, CreditCard, Clock, Trash2 } from 'lucide-react';
 import { ErrorDisplay } from '../../components/common/ErrorDisplay';
 import { ConfirmDialog, useConfirmDialog } from "../../components/common/Popup";
 import { useAuth } from '../../context/AuthContext';
+import SearchableRecords from '../../components/common/SearchableRecords';
 
 const AutoGJV = () => {
   const { dialogState, showConfirmDialog, closeDialog } = useConfirmDialog();
   const { getWorkspaceSelection } = useAuth();
   const userSession = getWorkspaceSelection();
   const [selectedGJVType, setSelectedGJVType] = useState('');
+  const [selectedIds, setSelectedIds] = useState(new Set());
   const [gjvEntries, setGjvEntries] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [savedConfigurations, setSavedConfigurations] = useState([]);
   const [showSavedConfigs, setShowSavedConfigs] = useState(false);
   const [editingEntryId, setEditingEntryId] = useState(null);
   const [editingSavedConfigId, setEditingSavedConfigId] = useState(null);
+  const [searchFilters, setSearchFilters] = useState({ searchTerm: '', gjvStatus: '' });
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 20;
   const [currentEntry, setCurrentEntry] = useState({
     particulars: '',
     debitAccount: '',
@@ -402,6 +407,54 @@ const deleteEntry = async (entry) => {
     { key: 'effectiveDate', title: 'Effective Date' }
   ];
 
+  const filteredConfigurations = savedConfigurations.filter(config => {
+    const { searchTerm, gjvStatus } = searchFilters;
+    const matchesSearch = !searchTerm ||
+      config.gjvType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      config.description?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = !gjvStatus || config.status === gjvStatus;
+    return matchesSearch && matchesStatus;
+  });
+  const totalPages = Math.ceil(filteredConfigurations.length / ITEMS_PER_PAGE);
+  const paginatedConfigurations = filteredConfigurations.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  const handleSelectAll = () => {
+    if (paginatedConfigurations.every(item => selectedIds.has(item.id))) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(paginatedConfigurations.map(item => item.id)));
+    }
+  };
+
+  const handleSelectItem = (id) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) { next.delete(id); } else { next.add(id); }
+    setSelectedIds(next);
+  };
+
+  const handleBulkDelete = async () => {
+    const confirmed = await showConfirmDialog({
+      title: 'Delete Selected',
+      message: `Are you sure you want to delete ${selectedIds.size} selected record(s)? This action cannot be undone.`,
+      confirmText: 'Delete All',
+      cancelText: 'Cancel',
+      type: 'error'
+    });
+    if (confirmed) {
+      let count = 0;
+      for (const id of selectedIds) {
+        const result = await executeApi(autoGjvService.delete, id);
+        if (result.success) count++;
+      }
+      setSelectedIds(new Set());
+      await loadSavedConfigurations();
+      showToast(`${count} record(s) deleted successfully!`, 'success');
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Error Display */}
@@ -438,57 +491,117 @@ const deleteEntry = async (entry) => {
 
       {/* Saved Configurations */}
       {showSavedConfigs && (
-        <div className="bg-white/60 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200/60 overflow-hidden">
-          <div className="bg-gradient-to-r from-purple-500 to-pink-500 px-6 py-4">
-            <h2 className="text-xl font-semibold text-white">Saved Auto GJV Configurations</h2>
-          </div>
-          <div className="p-6">
-            {savedConfigurations.length === 0 ? (
-              <div className="text-center py-8">
-                <Settings className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-                <p className="text-slate-500">No saved configurations found.</p>
+        <SearchableRecords
+          title="Saved Auto GJV Configurations"
+          totalRecords={filteredConfigurations.length}
+          searchFilters={searchFilters}
+          onFiltersChange={(f) => { setSearchFilters(f); setCurrentPage(1); }}
+          loading={loading}
+          gradientFrom="from-purple-500"
+          gradientTo="to-pink-500"
+          searchPlaceholder="Search by GJV type or description..."
+          filterConfig={{ dateRange: false, amountRange: false, fromWhom: false, fundType: false, status: false, transactionMode: false }}
+          customFilters={[
+            {
+              key: 'gjvStatus',
+              label: 'Status',
+              type: 'select',
+              icon: Settings,
+              options: [
+                { value: '', label: 'All Status' },
+                { value: 'Active', label: 'Active' },
+                { value: 'Inactive', label: 'Inactive' },
+              ]
+            }
+          ]}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          pageSize={ITEMS_PER_PAGE}
+        >
+          {selectedIds.size > 0 && (
+            <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-4">
+              <span className="text-sm font-medium text-red-700">
+                {selectedIds.size} record(s) selected
+              </span>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setSelectedIds(new Set())}
+                  className="text-sm text-gray-600 hover:text-gray-900 px-3 py-1.5 border border-gray-300 rounded-lg bg-white"
+                >
+                  Clear
+                </button>
+                <button
+                  onClick={handleBulkDelete}
+                  className="flex items-center space-x-2 bg-red-600 hover:bg-red-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Delete Selected ({selectedIds.size})</span>
+                </button>
               </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-slate-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">GJV Type</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Description</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Entries</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Status</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Created Date</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Actions</th>
+            </div>
+          )}
+          {filteredConfigurations.length === 0 ? (
+            <div className="text-center py-8">
+              <Settings className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+              <p className="text-slate-500">No saved configurations found.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="px-4 py-3 w-10">
+                      <input
+                        type="checkbox"
+                        checked={paginatedConfigurations.length > 0 && paginatedConfigurations.every(item => selectedIds.has(item.id))}
+                        onChange={handleSelectAll}
+                        className="rounded"
+                      />
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">GJV Type</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Description</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Entries</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Created Date</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white/40 divide-y divide-slate-200">
+                  {paginatedConfigurations.map((config) => (
+                    <tr key={config.id} className="hover:bg-white/60 transition-colors">
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(config.id)}
+                          onChange={() => handleSelectItem(config.id)}
+                          className="rounded"
+                        />
+                      </td>
+                      <td className="px-6 py-4 text-sm font-medium text-slate-900">{config.gjvType}</td>
+                      <td className="px-6 py-4 text-sm text-slate-600">{config.description}</td>
+                      <td className="px-6 py-4 text-sm text-slate-900">{config.totalEntries || 0}</td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          config.status === 'Active'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {config.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-500">{config.createdDate}</td>
+                      <td className="px-6 py-4 text-sm font-medium space-x-3">
+                        <button onClick={() => loadConfiguration(config.id)} className="text-blue-600 hover:text-blue-900">Edit</button>
+                        <button onClick={() => handleDeleteConfig(config)} className="text-red-600 hover:text-red-900">Delete</button>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="bg-white/40 divide-y divide-slate-200">
-                    {savedConfigurations.map((config) => (
-                      <tr key={config.id} className="hover:bg-white/60 transition-colors">
-                        <td className="px-6 py-4 text-sm font-medium text-slate-900">{config.gjvType}</td>
-                        <td className="px-6 py-4 text-sm text-slate-600">{config.description}</td>
-                        <td className="px-6 py-4 text-sm text-slate-900">{config.totalEntries || 0}</td>
-                        <td className="px-6 py-4">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            config.status === 'Active' 
-                              ? 'bg-green-100 text-green-800' 
-                              : 'bg-red-100 text-red-800'
-                          }`}>
-                            {config.status}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-slate-500">{config.createdDate}</td>
-                        <td className="px-6 py-4 text-sm font-medium space-x-3">
-                          <button onClick={() => loadConfiguration(config.id)} className="text-blue-600 hover:text-blue-900">Edit</button>
-                          <button onClick={() => handleDeleteConfig(config)} className="text-red-600 hover:text-red-900">Delete</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </SearchableRecords>
       )}
 
       {/* Main Configuration Form */}

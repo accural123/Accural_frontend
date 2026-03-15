@@ -7,12 +7,13 @@ import { ConfirmDialog, useConfirmDialog } from "../../components/common/Popup";
 import SearchableDropdown from "../../components/common/SearchableDropdown";
 import WorkDetails from "../../components/common/WorkDetails";
 import { advanceDepositService, accountService } from "../../services/realServices";
+import { showConfirmDialog as showUtilConfirmDialog } from "../../utils/confirmDialog";
 import { useApiService } from "../../hooks/useApiService";
 import { useToast } from "../../hooks/useToast";
-import { CreditCard, Receipt, AlertCircle, Plus, Save, RefreshCw, Eye, FileText, Search, X, Calendar, DollarSign, Users, Hash, Building } from 'lucide-react';
+import { CreditCard, Receipt, AlertCircle, Plus, Save, RefreshCw, Eye, FileText, X, Calendar, DollarSign, Users, Hash, Building, Trash2 } from 'lucide-react';
 import ErrorDisplay from '../../components/common/ErrorDisplay';
 import { VoiceInputField } from '../../components/common/VoiceInputField';
-import Pagination from '../../components/common/Pagination';
+import SearchableRecords from '../../components/common/SearchableRecords';
 import EmployeeSelector from '../transaction/employee/EmployeeSelector';
 
 
@@ -60,13 +61,14 @@ const AdvanceDeposits = ({
   const [savedRecords, setSavedRecords] = useState([]);
   const [showRecords, setShowRecords] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchFilters, setSearchFilters] = useState({ searchTerm: '', transactionType: '', voucherType: '' });
   const [errors, setErrors] = useState({});
   const [showMultipleEmployees, setShowMultipleEmployees] = useState(false);
   const [employeeEntries, setEmployeeEntries] = useState([]);
   const [showWorkDetails, setShowWorkDetails] = useState(false);
   const [showEmployeeDetails, setShowEmployeeDetails] = useState(false);
   const [viewingEmployeeRecord, setViewingEmployeeRecord] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(new Set());
 
   const { executeApi, loading, error, clearError } = useApiService();
   const { toasts, showToast, removeToast } = useToast();
@@ -524,11 +526,11 @@ const AdvanceDeposits = ({
   };
 
   const handleSearch = async () => {
-    if (searchTerm.trim()) {
-      const result = await executeApi(advanceDepositService.search, searchTerm);
+    if (searchFilters.searchTerm.trim()) {
+      const result = await executeApi(advanceDepositService.search, searchFilters.searchTerm);
       if (result.success) {
         // Filter by register type
-        const filteredRecords = result.data.filter(record => 
+        const filteredRecords = result.data.filter(record =>
           record.registerType === defaultRegisterType
         );
         setSavedRecords(filteredRecords || []);
@@ -538,19 +540,19 @@ const AdvanceDeposits = ({
     }
   };
 
-  const clearSearch = () => {
-    setSearchTerm('');
-    loadSavedRecords();
-  };
-
-  const filteredRecords = !searchTerm.trim() ? savedRecords : savedRecords.filter(record =>
-    record.nameDesignation?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    record.voucherNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    record.ledgerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    record.transactionType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    record.voucherType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    record.referenceNumber?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredRecords = savedRecords.filter(record => {
+    const { searchTerm, transactionType, voucherType } = searchFilters;
+    const matchesSearch = !searchTerm ||
+      record.nameDesignation?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      record.voucherNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      record.ledgerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      record.transactionType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      record.voucherType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      record.referenceNumber?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesTransactionType = !transactionType || record.transactionType === transactionType;
+    const matchesVoucherType = !voucherType || record.voucherType === voucherType;
+    return matchesSearch && matchesTransactionType && matchesVoucherType;
+  });
 
   const totalPages = Math.ceil(filteredRecords.length / ITEMS_PER_PAGE);
   const paginatedRecords = filteredRecords.slice(
@@ -558,7 +560,60 @@ const AdvanceDeposits = ({
     currentPage * ITEMS_PER_PAGE
   );
 
+  const handleSelectAll = () => {
+    if (paginatedRecords.every(item => selectedIds.has(item.id))) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(paginatedRecords.map(item => item.id)));
+    }
+  };
+
+  const handleSelectItem = (id) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) { next.delete(id); } else { next.add(id); }
+    setSelectedIds(next);
+  };
+
+  const handleBulkDelete = async () => {
+    const confirmed = await showUtilConfirmDialog(
+      'Delete Selected',
+      `Are you sure you want to delete ${selectedIds.size} selected record(s)? This action cannot be undone.`,
+      'Delete All',
+      'Cancel'
+    );
+    if (confirmed) {
+      let count = 0;
+      for (const id of selectedIds) {
+        const result = await executeApi(advanceDepositService.delete, id);
+        if (result.success) count++;
+      }
+      setSelectedIds(new Set());
+      await loadSavedRecords();
+      showToast(`${count} record(s) deleted successfully!`, 'success');
+    }
+  };
+
   const columns = [
+    {
+      key: '__select__',
+      title: (
+        <input
+          type="checkbox"
+          checked={paginatedRecords.length > 0 && paginatedRecords.every(item => selectedIds.has(item.id))}
+          onChange={handleSelectAll}
+          className="rounded"
+        />
+      ),
+      render: (_value, row) => (
+        <input
+          type="checkbox"
+          checked={selectedIds.has(row.id)}
+          onChange={() => handleSelectItem(row.id)}
+          className="rounded"
+          onClick={(e) => e.stopPropagation()}
+        />
+      )
+    },
     { key: 'financialYear', title: 'Financial Year', sortable: true },
     ...(showLedgerField ? [
       {
@@ -655,72 +710,88 @@ const AdvanceDeposits = ({
 
       {/* Records List */}
       {showRecords && (
-        <div className="bg-white/60 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200/60 overflow-hidden">
-          <div className="bg-gradient-to-r from-purple-500 to-pink-500 px-6 py-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-white">Saved Records ({savedRecords.length})</h2>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search records..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                  className="pl-10 pr-10 py-2 bg-white/20 backdrop-blur-sm border border-white/30 rounded-lg text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/50"
-                />
-                {searchTerm && (
-                  <button
-                    onClick={clearSearch}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/70 hover:text-white"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
+        <SearchableRecords
+          title="Saved Records"
+          totalRecords={filteredRecords.length}
+          searchFilters={searchFilters}
+          onFiltersChange={(f) => { setSearchFilters(f); setCurrentPage(1); }}
+          loading={loading}
+          gradientFrom="from-purple-500"
+          gradientTo="to-pink-500"
+          searchPlaceholder="Search by name, voucher no, ledger, or transaction type..."
+          filterConfig={{ dateRange: true, amountRange: false, fromWhom: false, fundType: false, status: false, transactionMode: false }}
+          customFilters={[
+            {
+              key: 'transactionType',
+              label: 'Transaction Type',
+              type: 'select',
+              icon: Receipt,
+              options: [
+                { value: '', label: 'All Types' },
+                { value: 'Advance', label: 'Advance' },
+                { value: 'Deposit', label: 'Deposit' },
+              ]
+            },
+            {
+              key: 'voucherType',
+              label: 'Voucher Type',
+              type: 'text',
+              icon: FileText,
+              placeholder: 'Voucher type...'
+            }
+          ]}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          pageSize={ITEMS_PER_PAGE}
+        >
+          {selectedIds.size > 0 && (
+            <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-4">
+              <span className="text-sm font-medium text-red-700">
+                {selectedIds.size} record(s) selected
+              </span>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setSelectedIds(new Set())}
+                  className="text-sm text-gray-600 hover:text-gray-900 px-3 py-1.5 border border-gray-300 rounded-lg bg-white"
+                >
+                  Clear
+                </button>
+                <button
+                  onClick={handleBulkDelete}
+                  className="flex items-center space-x-2 bg-red-600 hover:bg-red-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Delete Selected ({selectedIds.size})</span>
+                </button>
               </div>
             </div>
-          </div>
-          
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-              <span className="ml-2 text-slate-600">Loading records...</span>
+          )}
+          {filteredRecords.length === 0 ? (
+            <div className="text-center py-8">
+              <Receipt className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+              <p className="text-slate-500">
+                {searchFilters.searchTerm || searchFilters.transactionType || searchFilters.voucherType ? 'No records found matching your search.' : 'No records found.'}
+              </p>
+              {!searchFilters.searchTerm && !searchFilters.transactionType && !searchFilters.voucherType && (
+                <button
+                  onClick={() => setShowRecords(false)}
+                  className="text-purple-600 hover:text-purple-800 text-sm font-medium mt-2"
+                >
+                  Create your first record →
+                </button>
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
-              {filteredRecords.length === 0 ? (
-                <div className="text-center py-8">
-                  <Receipt className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-                  <p className="text-slate-500">
-                    {searchTerm ? 'No records found matching your search.' : 'No records found.'}
-                  </p>
-                  {!searchTerm && (
-                    <button
-                      onClick={() => setShowRecords(false)}
-                      className="text-purple-600 hover:text-purple-800 text-sm font-medium mt-2"
-                    >
-                      Create your first record →
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <>
-                  <DataTable
-                    columns={columns}
-                    data={paginatedRecords}
-                    onEdit={handleEdit}
-                    onDelete={handleDelete}
-                  />
-                  {totalPages > 1 && (
-                    <Pagination
-                      currentPage={currentPage}
-                      totalPages={totalPages}
-                      onPageChange={setCurrentPage}
-                      pageSize={ITEMS_PER_PAGE}
-                    />
-                  )}
-                  {/* Employee Entries Detail Panel */}
-                  {viewingEmployeeRecord && viewingEmployeeRecord.employeeEntries?.length > 0 && (
+              <DataTable
+                columns={columns}
+                data={paginatedRecords}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+              />
+              {/* Employee Entries Detail Panel */}
+              {viewingEmployeeRecord && viewingEmployeeRecord.employeeEntries?.length > 0 && (
                     <div className="m-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
                       <div className="flex items-center justify-between mb-3">
                         <h4 className="text-md font-semibold text-orange-800 flex items-center">
@@ -782,11 +853,9 @@ const AdvanceDeposits = ({
                       </div>
                     </div>
                   )}
-                </>
-              )}
             </div>
           )}
-        </div>
+        </SearchableRecords>
       )}
 
       {/* Main Form */}

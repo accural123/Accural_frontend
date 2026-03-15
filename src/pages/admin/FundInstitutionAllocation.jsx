@@ -1,14 +1,16 @@
 
 import React, { useState, useEffect } from 'react';
-import { Users, Building2, Wallet, Settings, Save, Search, Edit, Trash2, Plus, X } from 'lucide-react';
+import { Users, Building2, Wallet, Settings, Save, Edit, Trash2, Plus, X } from 'lucide-react';
 import { institutionService, fundService, fundAllocationService } from "../../services/realServices";
 import { authService } from "../../services/authService";
 import { useApiService } from "../../hooks/useApiService";
 import { ErrorDisplay } from '../../components/common/ErrorDisplay';
 import SearchableDropdown from '../../components/common/SearchableDropdown';// Import your dropdown component
 import { ConfirmDialog, useConfirmDialog } from "../../components/common/Popup";
+import SearchableRecords from '../../components/common/SearchableRecords';
 const FundInstitutionAllocation = () => {
   const { dialogState, showConfirmDialog, closeDialog } = useConfirmDialog();
+  const [selectedIds, setSelectedIds] = useState(new Set());
   const [users, setUsers] = useState([]);
   const [funds, setFunds] = useState([]);
   const [institutions, setInstitutions] = useState([]);
@@ -16,7 +18,7 @@ const FundInstitutionAllocation = () => {
   const [loading, setLoading] = useState(true);
   const [showAllocationModal, setShowAllocationModal] = useState(false);
   const [editingAllocation, setEditingAllocation] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchFilters, setSearchFilters] = useState({ searchTerm: '', status: '', user: '', dateFrom: '', dateTo: '' });
   const [filterUser, setFilterUser] = useState('');
   const [submitLoading, setSubmitLoading] = useState(false);
   const { executeApi, loading: apiLoading, error, clearError } = useApiService();
@@ -294,17 +296,58 @@ const FundInstitutionAllocation = () => {
   };
 
   const filteredAllocations = allocations.filter(allocation => {
-    const user = users.find(u => 
-      String(u.id) === String(allocation.id) || 
+    const user = users.find(u =>
+      String(u.id) === String(allocation.id) ||
       String(u.id) === String(allocation.userId)
     );
-    const matchesSearch = (user?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (user?.username || '').toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesUserFilter = !filterUser || 
-                             String(allocation.id) === String(filterUser) ||
-                             String(allocation.userId) === String(filterUser);
-    return matchesSearch && matchesUserFilter;
+    const { searchTerm, status, user: userFilter, dateFrom, dateTo } = searchFilters;
+    const matchesSearch = !searchTerm ||
+                         (user?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (user?.username || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (user?.role || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (allocation.status || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesUserFilter = !userFilter ||
+                             String(allocation.id) === String(userFilter) ||
+                             String(allocation.userId) === String(userFilter);
+    const matchesStatus = !status || allocation.status === status;
+    const matchesDateFrom = !dateFrom || (allocation.validFrom && allocation.validFrom >= dateFrom);
+    const matchesDateTo = !dateTo || (allocation.validTo && allocation.validTo <= dateTo);
+    return matchesSearch && matchesUserFilter && matchesStatus && matchesDateFrom && matchesDateTo;
   });
+
+  const handleSelectAll = () => {
+    if (filteredAllocations.every(item => selectedIds.has(item.id))) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredAllocations.map(item => item.id)));
+    }
+  };
+
+  const handleSelectItem = (id) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) { next.delete(id); } else { next.add(id); }
+    setSelectedIds(next);
+  };
+
+  const handleBulkDelete = async () => {
+    const confirmed = await showConfirmDialog({
+      title: 'Delete Selected',
+      message: `Are you sure you want to delete ${selectedIds.size} selected record(s)? This action cannot be undone.`,
+      confirmText: 'Delete All',
+      cancelText: 'Cancel',
+      type: 'error'
+    });
+    if (confirmed) {
+      let count = 0;
+      for (const id of selectedIds) {
+        const result = await fundAllocationService.delete(id);
+        if (result.success) count++;
+      }
+      setSelectedIds(new Set());
+      await loadAllData();
+      showToast(`${count} record(s) deleted successfully!`, 'success');
+    }
+  };
 
   const AllocationModal = () => (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -559,44 +602,76 @@ const FundInstitutionAllocation = () => {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="bg-white rounded-lg shadow-md p-4">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0 md:space-x-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search by user name..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-          <div className="flex space-x-4 min-w-64">
-            <SearchableDropdown
-              options={filterUserOptions}
-              value={filterUser}
-              onChange={handleFilterUserChange}
-              placeholder="Filter by user"
-              searchPlaceholder="Search users..."
-              icon={Users}
-              allowClear={true}
-              className="min-w-64"
-            />
-          </div>
-        </div>
-      </div>
-
       {/* Allocations Table */}
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <div className="bg-gradient-to-r from-blue-500 to-purple-500 px-6 py-4">
-          <h2 className="text-xl font-semibold text-white">User Allocations ({filteredAllocations.length})</h2>
-        </div>
-        
+      <SearchableRecords
+        title="User Allocations"
+        totalRecords={filteredAllocations.length}
+        searchFilters={searchFilters}
+        onFiltersChange={(f) => { setSearchFilters(f); }}
+        loading={loading}
+        gradientFrom="from-blue-500"
+        gradientTo="to-purple-500"
+        searchPlaceholder="Search by user name, role, status..."
+        filterConfig={{ dateRange: true, amountRange: false, fromWhom: false, fundType: false, status: false, transactionMode: false }}
+        customFilters={[
+          {
+            key: 'status',
+            label: 'Status',
+            type: 'select',
+            icon: Settings,
+            options: [
+              { value: '', label: 'All Status' },
+              { value: 'Active', label: 'Active' },
+              { value: 'Inactive', label: 'Inactive' },
+              { value: 'Suspended', label: 'Suspended' }
+            ]
+          },
+          {
+            key: 'user',
+            label: 'User',
+            type: 'select',
+            icon: Users,
+            options: [
+              { value: '', label: 'All Users' },
+              ...users.map(u => ({ value: String(u.id), label: u.name }))
+            ]
+          }
+        ]}
+      >
+        {selectedIds.size > 0 && (
+          <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-4">
+            <span className="text-sm font-medium text-red-700">
+              {selectedIds.size} record(s) selected
+            </span>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setSelectedIds(new Set())}
+                className="text-sm text-gray-600 hover:text-gray-900 px-3 py-1.5 border border-gray-300 rounded-lg bg-white"
+              >
+                Clear
+              </button>
+              <button
+                onClick={handleBulkDelete}
+                className="flex items-center space-x-2 bg-red-600 hover:bg-red-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span>Delete Selected ({selectedIds.size})</span>
+              </button>
+            </div>
+          </div>
+        )}
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
+                <th className="px-4 py-3 w-10">
+                  <input
+                    type="checkbox"
+                    checked={filteredAllocations.length > 0 && filteredAllocations.every(item => selectedIds.has(item.id))}
+                    onChange={handleSelectAll}
+                    className="rounded"
+                  />
+                </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Allocated Funds</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Allocated Institutions</th>
@@ -608,12 +683,20 @@ const FundInstitutionAllocation = () => {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredAllocations.map((allocation) => {
-                const user = users.find(u => 
-                  String(u.id) === String(allocation.id) || 
+                const user = users.find(u =>
+                  String(u.id) === String(allocation.id) ||
                   String(u.id) === String(allocation.userId)
                 );
                 return (
                   <tr key={allocation.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(allocation.id)}
+                        onChange={() => handleSelectItem(allocation.id)}
+                        className="rounded"
+                      />
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <Users className="h-4 w-4 text-gray-400 mr-2" />
@@ -690,25 +773,24 @@ const FundInstitutionAllocation = () => {
               })}
             </tbody>
           </table>
+          {filteredAllocations.length === 0 && (
+            <div className="text-center py-8">
+              <Settings className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-500">
+                {Object.values(searchFilters).some(v => v) ? 'No allocations found matching your filters.' : 'No allocations created yet.'}
+              </p>
+              {!Object.values(searchFilters).some(v => v) && (
+                <button
+                  onClick={() => setShowAllocationModal(true)}
+                  className="text-blue-600 hover:text-blue-800 text-sm font-medium mt-2"
+                >
+                  Create your first allocation →
+                </button>
+              )}
+            </div>
+          )}
         </div>
-        
-        {filteredAllocations.length === 0 && (
-          <div className="text-center py-8">
-            <Settings className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-500">
-              {searchTerm || filterUser ? 'No allocations found matching your filters.' : 'No allocations created yet.'}
-            </p>
-            {!searchTerm && !filterUser && (
-              <button
-                onClick={() => setShowAllocationModal(true)}
-                className="text-blue-600 hover:text-blue-800 text-sm font-medium mt-2"
-              >
-                Create your first allocation →
-              </button>
-            )}
-          </div>
-        )}
-      </div>
+      </SearchableRecords>
 <ConfirmDialog
   isOpen={dialogState.isOpen}
   onClose={closeDialog}

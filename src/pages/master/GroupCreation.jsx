@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Layers, Search, Edit, Trash2, Eye, Plus, Save, Shield, Crown, Folder, Building2, Users, Hash } from 'lucide-react';
+import { Layers, Edit, Trash2, Eye, Plus, Save, Shield, Crown, Folder, Building2, Users, Hash } from 'lucide-react';
+import SearchableRecords from '../../components/common/SearchableRecords';
 import { Card } from "../../components/common/Card";
 import { FormField } from "../../components/common/FormField";
 import { SubmitButton } from "../../components/common/SubmitButton";
@@ -31,8 +32,9 @@ const GroupCreation = () => {
   const [groups, setGroups] = useState([]);
   const [showTable, setShowTable] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchFilters, setSearchFilters] = useState({ searchTerm: '', mainGroup: '' });
   const [submitLoading, setSubmitLoading] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
 
   const { executeApi, loading, error, clearError } = useApiService();
 
@@ -353,28 +355,56 @@ const handleDelete = async (id) => {
   //   }
   // };
 
-  const handleSearch = async () => {
-    if (searchTerm.trim()) {
-      const result = await executeApi(groupService.search, searchTerm);
-      if (result.success) {
-        setGroups(result.data || []);
-      }
-    } else {
-      await loadGroups();
-    }
-  };
-
   const filteredGroups = groups.filter(group => {
+    const f = searchFilters;
     const name = getGroupName(group);
     const code = group.groupCode || '';
     const main = group.underMainGroup || '';
     const parent = group.underGroup || '';
-    
-    return code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-           name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-           main.toLowerCase().includes(searchTerm.toLowerCase()) ||
-           parent.toLowerCase().includes(searchTerm.toLowerCase());
+    const searchMatch = !f.searchTerm ||
+      code.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
+      name.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
+      main.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
+      parent.toLowerCase().includes(f.searchTerm.toLowerCase());
+    const mainGroupMatch = !f.mainGroup || group.underMainGroup === f.mainGroup || group.underGroup === f.mainGroup;
+    return searchMatch && mainGroupMatch;
   });
+
+  const handleSelectAll = () => {
+    if (filteredGroups.every(item => selectedIds.has(item.id))) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredGroups.map(item => item.id)));
+    }
+  };
+
+  const handleSelectItem = (id) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) { next.delete(id); } else { next.add(id); }
+    setSelectedIds(next);
+  };
+
+  const handleBulkDelete = async () => {
+    const confirmed = await showConfirmDialog({
+      title: 'Delete Selected',
+      message: `Are you sure you want to delete ${selectedIds.size} selected record(s)? This action cannot be undone.`,
+      confirmText: 'Delete All',
+      cancelText: 'Cancel',
+      type: 'error'
+    });
+    if (confirmed) {
+      let count = 0;
+      for (const id of selectedIds) {
+        const group = groups.find(g => g.id === id);
+        if (group && isMainGroup(group)) continue;
+        const result = await executeApi(groupService.delete, id);
+        if (result.success) count++;
+      }
+      setSelectedIds(new Set());
+      await loadGroups();
+      showToast(`${count} record(s) deleted successfully!`, 'success');
+    }
+  };
 
   const getGroupTypeInfo = () => {
     switch (groupType) {
@@ -621,34 +651,66 @@ const handleDelete = async (id) => {
 
       {/* Groups List */}
       {showTable && (
-        <div className="bg-white/60 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200/60 overflow-hidden">
-          <div className="bg-gradient-to-r from-blue-500 to-indigo-500 px-6 py-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-white">Registered Groups ({groups.length})</h2>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search by code or name..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                  className="pl-10 pr-4 py-2 bg-white/20 backdrop-blur-sm border border-white/30 rounded-lg text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/50"
-                />
+        <SearchableRecords
+          title="Registered Groups"
+          totalRecords={filteredGroups.length}
+          searchFilters={searchFilters}
+          onFiltersChange={setSearchFilters}
+          loading={loading}
+          gradientFrom="from-blue-500"
+          gradientTo="to-indigo-500"
+          searchPlaceholder="Search by code, name, main group..."
+          filterConfig={{ dateRange: false, amountRange: false, fromWhom: false, fundType: false, status: false, transactionMode: false }}
+          customFilters={[
+            {
+              key: 'mainGroup',
+              label: 'Main Group',
+              type: 'select',
+              options: [
+                { value: '', label: 'All Main Groups' },
+                { value: 'Income', label: 'Income' },
+                { value: 'Expenditure', label: 'Expenditure' },
+                { value: 'Assets', label: 'Assets' },
+                { value: 'Liabilities', label: 'Liabilities' },
+              ],
+            },
+          ]}
+        >
+
+          {selectedIds.size > 0 && (
+            <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-4">
+              <span className="text-sm font-medium text-red-700">
+                {selectedIds.size} record(s) selected
+              </span>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setSelectedIds(new Set())}
+                  className="text-sm text-gray-600 hover:text-gray-900 px-3 py-1.5 border border-gray-300 rounded-lg bg-white"
+                >
+                  Clear
+                </button>
+                <button
+                  onClick={handleBulkDelete}
+                  className="flex items-center space-x-2 bg-red-600 hover:bg-red-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Delete Selected ({selectedIds.size})</span>
+                </button>
               </div>
             </div>
-          </div>
-          
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              <span className="ml-2 text-slate-600">Loading groups...</span>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
+          )}
+          <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-slate-50">
                   <tr>
+                    <th className="px-4 py-3 w-10">
+                      <input
+                        type="checkbox"
+                        checked={filteredGroups.length > 0 && filteredGroups.every(item => selectedIds.has(item.id))}
+                        onChange={handleSelectAll}
+                        className="rounded"
+                      />
+                    </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Type</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Group Code</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Group Name</th>
@@ -662,6 +724,14 @@ const handleDelete = async (id) => {
                 <tbody className="bg-white/40 divide-y divide-slate-200">
                   {filteredGroups.map((group) => (
                     <tr key={group.id} className="hover:bg-white/60 transition-colors">
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(group.id)}
+                          onChange={() => handleSelectItem(group.id)}
+                          className="rounded"
+                        />
+                      </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center">
                           {isMainGroup(group) ? (
@@ -743,25 +813,16 @@ const handleDelete = async (id) => {
                 </tbody>
               </table>
             </div>
-          )}
-          
-          {!loading && filteredGroups.length === 0 && (
-            <div className="text-center py-8">
-              <Layers className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-              <p className="text-slate-500">
-                {searchTerm ? 'No groups found matching your search.' : 'No groups created yet.'}
-              </p>
-              {!searchTerm && (
-                <button
-                  onClick={() => setShowTable(false)}
-                  className="text-blue-600 hover:text-blue-800 text-sm font-medium mt-2"
-                >
+            {filteredGroups.length === 0 && (
+              <div className="text-center py-8">
+                <Layers className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                <p className="text-slate-500">No groups found matching your filters.</p>
+                <button onClick={() => setShowTable(false)} className="text-blue-600 hover:text-blue-800 text-sm font-medium mt-2">
                   Create your first group →
                 </button>
-              )}
-            </div>
-          )}
-        </div>
+              </div>
+            )}
+        </SearchableRecords>
       )}
       <ConfirmDialog
   isOpen={dialogState.isOpen}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { BookOpen, Users, DollarSign, Building, CreditCard, Eye, Search, Edit, Trash2, Plus, Save, FileText, MapPin, Wallet } from 'lucide-react';
+import { BookOpen, Users, DollarSign, Building, CreditCard, Eye, Edit, Trash2, Plus, Save, FileText, MapPin, Wallet } from 'lucide-react';
+import SearchableRecords from '../../components/common/SearchableRecords';
 import { FormField } from "../../components/common/FormField";
 import SearchableDropdown from "../../components/common/SearchableDropdown";
 import { ledgerService, institutionService, fundService, groupService } from "../../services/realServices";
@@ -33,16 +34,17 @@ const MasterLedgerCreation = () => {
   const [groups, setGroups] = useState([]);
   const [showTable, setShowTable] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchFilters, setSearchFilters] = useState({ searchTerm: '', underGroup: '' });
   const [showBankDetails, setShowBankDetails] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
 
   const { executeApi, loading, error, clearError } = useApiService();
 
   // Convert group options to SearchableDropdown format (loaded dynamically from API)
   const groupOptions = groups.map(g => ({
     value: g.groupName,
-    label: g.groupName,
+    label: g.groupCode ? `${g.groupName} (${g.groupCode})` : g.groupName,
     description: g.underMainGroup ? `Main Group: ${g.underMainGroup}` : (g.description || ''),
   }));
 
@@ -327,27 +329,6 @@ const handleDelete = async (id) => {
 };
  
 
-  const handleSearch = async () => {
-    if (searchTerm.trim()) {
-      const result = await executeApi(ledgerService.search, searchTerm);
-      if (result.success) {
-        setLedgers(result.data || []);
-      }
-    } else {
-      await loadLedgers();
-    }
-  };
-
-  const filteredLedgers = ledgers.filter(ledger =>
-    ledger.ledgerCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    ledger.ledgerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    ledger.underGroup?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    ledger.localBodyType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    getFundName(ledger.fundId)?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    ledger.bankName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    getInstitutionName(ledger.institutionId)?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   // Get local body type label for display
   const getLocalBodyTypeLabel = (value) => {
     const found = localBodyTypeOptions.find(type => type.value === value);
@@ -365,6 +346,52 @@ const handleDelete = async (id) => {
     const fund = funds.find(f => f.id === fundId);
     return fund ? fund.fundName : fundId;
   };
+
+  const handleSelectAll = () => {
+    if (filteredLedgers.every(item => selectedIds.has(item.id))) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredLedgers.map(item => item.id)));
+    }
+  };
+
+  const handleSelectItem = (id) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) { next.delete(id); } else { next.add(id); }
+    setSelectedIds(next);
+  };
+
+  const handleBulkDelete = async () => {
+    const confirmed = await showConfirmDialog({
+      title: 'Delete Selected',
+      message: `Are you sure you want to delete ${selectedIds.size} selected record(s)? This action cannot be undone.`,
+      confirmText: 'Delete All',
+      cancelText: 'Cancel',
+      type: 'error'
+    });
+    if (confirmed) {
+      let count = 0;
+      for (const id of selectedIds) {
+        const result = await executeApi(ledgerService.delete, id);
+        if (result.success) count++;
+      }
+      setSelectedIds(new Set());
+      await loadLedgers();
+      showToast(`${count} record(s) deleted successfully!`, 'success');
+    }
+  };
+
+  const filteredLedgers = ledgers.filter(ledger => {
+    const f = searchFilters;
+    const searchMatch = !f.searchTerm ||
+      ledger.ledgerCode?.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
+      ledger.ledgerName?.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
+      ledger.underGroup?.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
+      ledger.bankName?.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
+      getInstitutionName(ledger.institutionId)?.toLowerCase().includes(f.searchTerm.toLowerCase());
+    const underGroupMatch = !f.underGroup || ledger.underGroup?.toLowerCase().includes(f.underGroup.toLowerCase());
+    return searchMatch && underGroupMatch;
+  });
 
   return (
     <div className="space-y-6">
@@ -620,27 +647,54 @@ const handleDelete = async (id) => {
 
       {/* Ledgers List */}
       {showTable && (
-        <div className="bg-white/60 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200/60 overflow-hidden">
-          <div className="bg-gradient-to-r from-green-500 to-emerald-500 px-6 py-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-white">Ledger Accounts ({ledgers.length})</h2>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search ledgers..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2 bg-white/20 backdrop-blur-sm border border-white/30 rounded-lg text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/50"
-                />
+        <SearchableRecords
+          title="Ledger Accounts"
+          totalRecords={filteredLedgers.length}
+          searchFilters={searchFilters}
+          onFiltersChange={setSearchFilters}
+          loading={loading}
+          gradientFrom="from-green-500"
+          gradientTo="to-emerald-500"
+          searchPlaceholder="Search by code, name, group, bank..."
+          filterConfig={{ dateRange: false, amountRange: false, fromWhom: false, fundType: false, status: false, transactionMode: false }}
+          customFilters={[
+            { key: 'underGroup', label: 'Under Group', type: 'text', placeholder: 'Filter by group name' },
+          ]}
+        >
+          {selectedIds.size > 0 && (
+            <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-4">
+              <span className="text-sm font-medium text-red-700">
+                {selectedIds.size} record(s) selected
+              </span>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setSelectedIds(new Set())}
+                  className="text-sm text-gray-600 hover:text-gray-900 px-3 py-1.5 border border-gray-300 rounded-lg bg-white"
+                >
+                  Clear
+                </button>
+                <button
+                  onClick={handleBulkDelete}
+                  className="flex items-center space-x-2 bg-red-600 hover:bg-red-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Delete Selected ({selectedIds.size})</span>
+                </button>
               </div>
             </div>
-          </div>
-          
+          )}
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-slate-50">
                 <tr>
+                  <th className="px-4 py-3 w-10">
+                    <input
+                      type="checkbox"
+                      checked={filteredLedgers.length > 0 && filteredLedgers.every(item => selectedIds.has(item.id))}
+                      onChange={handleSelectAll}
+                      className="rounded"
+                    />
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Ledger Code</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Ledger Head</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Group</th>
@@ -654,6 +708,14 @@ const handleDelete = async (id) => {
               <tbody className="bg-white/40 divide-y divide-slate-200">
                 {filteredLedgers.map((ledger) => (
                   <tr key={ledger.id} className="hover:bg-white/60 transition-colors">
+                    <td className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(ledger.id)}
+                        onChange={() => handleSelectItem(ledger.id)}
+                        className="rounded"
+                      />
+                    </td>
                     <td className="px-6 py-4">
                       <div className="text-sm font-medium text-slate-900">{ledger.ledgerCode}</div>
                     </td>
@@ -704,25 +766,17 @@ const handleDelete = async (id) => {
                 ))}
               </tbody>
             </table>
-          </div>
-          
-          {filteredLedgers.length === 0 && (
-            <div className="text-center py-8">
-              <BookOpen className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-              <p className="text-slate-500">
-                {searchTerm ? 'No ledgers found matching your search.' : 'No ledgers created yet.'}
-              </p>
-              {!searchTerm && (
-                <button
-                  onClick={() => setShowTable(false)}
-                  className="text-blue-600 hover:text-blue-800 text-sm font-medium mt-2"
-                >
+            {filteredLedgers.length === 0 && (
+              <div className="text-center py-8">
+                <BookOpen className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                <p className="text-slate-500">No ledgers found matching your filters.</p>
+                <button onClick={() => setShowTable(false)} className="text-blue-600 hover:text-blue-800 text-sm font-medium mt-2">
                   Create your first ledger →
                 </button>
-              )}
-            </div>
-          )}
-        </div>
+              </div>
+            )}
+          </div>
+        </SearchableRecords>
       )}
       <ConfirmDialog
   isOpen={dialogState.isOpen}

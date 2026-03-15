@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, MapPin, Phone, Mail, FileText, Save, Plus, Edit, Trash2, Eye, Search, BookOpen, Wallet, Hash } from 'lucide-react';
+import { Building2, MapPin, Phone, Mail, FileText, Save, Plus, Edit, Trash2, Eye, Hash } from 'lucide-react';
+import SearchableRecords from '../../components/common/SearchableRecords';
 import { FormField } from "../../components/common/FormField";
 import SearchableDropdown from "../../components/common/SearchableDropdown"; // Import SearchableDropdown
 import { institutionService, fundService } from "../../services/realServices"; // Change this import when backend is ready
@@ -35,8 +36,9 @@ const InstitutionCreation = () => {
   const [funds, setFunds] = useState([]); // New state for funds
   const [showTable, setShowTable] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchFilters, setSearchFilters] = useState({ searchTerm: '', state: '', localBodyType: '' });
   const [submitLoading, setSubmitLoading] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
 
   const { executeApi, loading, error, clearError } = useApiService();
   const { user, getWorkspaceSelection } = useAuth();
@@ -410,23 +412,58 @@ const handleDelete = async (id) => {
   //   }
   // };
 
-  const handleSearch = async () => {
-    if (searchTerm.trim()) {
-      const result = await executeApi(institutionService.search, searchTerm);
-      if (result.success) {
-        setInstitutions(result.data || []);
-      }
+  const handleSelectAll = () => {
+    if (filteredInstitutions.every(item => selectedIds.has(item.id))) {
+      setSelectedIds(new Set());
     } else {
-      await loadInstitutions();
+      setSelectedIds(new Set(filteredInstitutions.map(item => item.id)));
     }
   };
 
-  // Filter institutions locally as fallback
-  const filteredInstitutions = institutions.filter(inst =>
-    inst.institutionName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    inst.mailingName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    inst.state?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const handleSelectItem = (id) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) { next.delete(id); } else { next.add(id); }
+    setSelectedIds(next);
+  };
+
+  const handleBulkDelete = async () => {
+    const confirmed = await showConfirmDialog({
+      title: 'Delete Selected',
+      message: `Are you sure you want to delete ${selectedIds.size} selected record(s)? This action cannot be undone.`,
+      confirmText: 'Delete All',
+      cancelText: 'Cancel',
+      type: 'error'
+    });
+    if (confirmed) {
+      let count = 0;
+      for (const id of selectedIds) {
+        const result = await executeApi(institutionService.delete, id);
+        if (result.success) count++;
+      }
+      setSelectedIds(new Set());
+      await loadInstitutions();
+      showToast(`${count} record(s) deleted successfully!`, 'success');
+    }
+  };
+
+  // Filter institutions locally
+  const filteredInstitutions = institutions.filter(inst => {
+    const f = searchFilters;
+    const searchMatch = !f.searchTerm ||
+      inst.institutionName?.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
+      inst.mailingName?.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
+      inst.state?.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
+      inst.panNo?.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
+      inst.mobileNo?.includes(f.searchTerm) ||
+      inst.alternateMobileNo?.includes(f.searchTerm) ||
+      inst.telephone?.includes(f.searchTerm) ||
+      inst.email?.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
+      inst.gstNo?.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
+      inst.institutionId?.toLowerCase().includes(f.searchTerm.toLowerCase());
+    const stateMatch = !f.state || inst.state?.toLowerCase().includes(f.state.toLowerCase());
+    const localBodyTypeMatch = !f.localBodyType || inst.localBodyType === f.localBodyType;
+    return searchMatch && stateMatch && localBodyTypeMatch;
+  });
 
   // Get local body type label for display
   const getLocalBodyTypeLabel = (value) => {
@@ -773,129 +810,135 @@ const handleDelete = async (id) => {
 
       {/* Institutions List */}
       {showTable && (
-        <div className="bg-white/60 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200/60 overflow-hidden">
-          <div className="bg-gradient-to-r from-blue-500 to-cyan-500 px-6 py-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-white">Registered Institutions ({institutions.length})</h2>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search institutions..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                  className="pl-10 pr-4 py-2 bg-white/20 backdrop-blur-sm border border-white/30 rounded-lg text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/50"
-                />
+        <SearchableRecords
+          title="Registered Institutions"
+          totalRecords={filteredInstitutions.length}
+          searchFilters={searchFilters}
+          onFiltersChange={setSearchFilters}
+          loading={loading}
+          gradientFrom="from-blue-500"
+          gradientTo="to-cyan-500"
+          searchPlaceholder="Search by name, state, PAN, mobile, email..."
+          filterConfig={{ dateRange: false, amountRange: false, fromWhom: false, fundType: false, status: false, transactionMode: false }}
+          customFilters={[
+            { key: 'state', label: 'State', type: 'text', placeholder: 'Filter by state' },
+            {
+              key: 'localBodyType',
+              label: 'Local Body Type',
+              type: 'select',
+              options: [
+                { value: '', label: 'All Types' },
+                { value: 'municipal_corporation', label: 'Municipal Corporation' },
+                { value: 'municipality', label: 'Municipality' },
+                { value: 'town_panchayat', label: 'Town Panchayat' },
+                { value: 'district_panchayat', label: 'District Panchayat' },
+                { value: 'block_panchayat', label: 'Block Panchayat' },
+                { value: 'village_panchayat', label: 'Village Panchayat' },
+                { value: 'other', label: 'Other' },
+              ],
+            },
+          ]}
+        >
+          {selectedIds.size > 0 && (
+            <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-4">
+              <span className="text-sm font-medium text-red-700">
+                {selectedIds.size} record(s) selected
+              </span>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setSelectedIds(new Set())}
+                  className="text-sm text-gray-600 hover:text-gray-900 px-3 py-1.5 border border-gray-300 rounded-lg bg-white"
+                >
+                  Clear
+                </button>
+                <button
+                  onClick={handleBulkDelete}
+                  className="flex items-center space-x-2 bg-red-600 hover:bg-red-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Delete Selected ({selectedIds.size})</span>
+                </button>
               </div>
             </div>
-          </div>
-          
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              <span className="ml-2 text-slate-600">Loading institutions...</span>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-slate-50">
-                  <tr>
-                    {/* <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Institution ID</th> */}
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Institution</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Location</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Local Body</th>
-                    {/* <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Ledger</th> */}
-                    {/* <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Fund</th> */}
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Contact</th>
-                    {/* <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Legal</th> */}
-                    {/* <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th> */}
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white/40 divide-y divide-slate-200">
-                  {filteredInstitutions.map((institution) => (
-                    <tr key={institution.id} className="hover:bg-white/60 transition-colors">
-                      {/* <td className="px-6 py-4">
-                        <div className="text-sm font-medium text-slate-900">{institution.institutionId}</div>
-                      </td> */}
-                      <td className="px-6 py-4">
-                        <div>
-                          <div className="text-sm font-medium text-slate-900">{institution.institutionName}</div>
-                          <div className="text-sm text-slate-500">{institution.mailingName}</div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-slate-900">{institution.state}</div>
-                        <div className="text-sm text-slate-500">{institution.pincode}</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-slate-900">
-                          {getLocalBodyTypeLabel(institution.localBodyType)}
-                        </div>
-                      </td>
-                      {/* <td className="px-6 py-4">
-                        <div className="text-sm text-slate-900">{getLedgerCodeLabel(institution.ledgerCode)}</div>
-                        <div className="text-sm text-slate-500">{institution.ledgerName}</div>
-                      </td> */}
-                     
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-slate-900">{institution.mobileNo}</div>
-                        <div className="text-sm text-slate-500">{institution.email}</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-slate-900">{institution.panNo}</div>
-                        <div className="text-sm text-slate-500">{institution.gstNo || 'N/A'}</div>
-                      </td>
-                      {/* <td className="px-6 py-4">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          institution.status === 'Active' 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-red-100 text-red-800'
-                        }`}>
-                          {institution.status || 'Active'}
-                        </span>
-                      </td> */}
-                      <td className="px-6 py-4 text-sm font-medium space-x-2">
-                        <button
-                          onClick={() => handleEdit(institution)}
-                          className="text-blue-600 hover:text-blue-900 p-1 rounded"
-                          title="Edit"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(institution.id)}
-                          className="text-red-600 hover:text-red-900 p-1 rounded"
-                          title="Delete"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
           )}
-          
-          {!loading && filteredInstitutions.length === 0 && (
-            <div className="text-center py-8">
-              <Building2 className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-              <p className="text-slate-500">
-                {searchTerm ? 'No institutions found matching your search.' : 'No institutions created yet.'}
-              </p>
-              {!searchTerm && (
-                <button
-                  onClick={() => setShowTable(false)}
-                  className="text-purple-600 hover:text-purple-800 text-sm font-medium mt-2"
-                >
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="px-4 py-3 w-10">
+                    <input
+                      type="checkbox"
+                      checked={filteredInstitutions.length > 0 && filteredInstitutions.every(item => selectedIds.has(item.id))}
+                      onChange={handleSelectAll}
+                      className="rounded"
+                    />
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Institution</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Location</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Local Body</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Contact</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Pan No</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Gst No</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white/40 divide-y divide-slate-200">
+                {filteredInstitutions.map((institution) => (
+                  <tr key={institution.id} className="hover:bg-white/60 transition-colors">
+                    <td className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(institution.id)}
+                        onChange={() => handleSelectItem(institution.id)}
+                        className="rounded"
+                      />
+                    </td>
+                    <td className="px-6 py-4">
+                      <div>
+                        <div className="text-sm font-medium text-slate-900">{institution.institutionName}</div>
+                        <div className="text-sm text-slate-500">{institution.mailingName}</div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-slate-900">{institution.state}</div>
+                      <div className="text-sm text-slate-500">{institution.pincode}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-slate-900">{getLocalBodyTypeLabel(institution.localBodyType)}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-slate-900">{institution.mobileNo}</div>
+                      <div className="text-sm text-slate-500">{institution.email}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-slate-900">{institution.panNo}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-slate-500">{institution.gstNo || 'N/A'}</div>
+                    </td>
+                    <td className="px-6 py-4 text-sm font-medium space-x-2">
+                      <button onClick={() => handleEdit(institution)} className="text-blue-600 hover:text-blue-900 p-1 rounded" title="Edit">
+                        <Edit className="h-4 w-4" />
+                      </button>
+                      <button onClick={() => handleDelete(institution.id)} className="text-red-600 hover:text-red-900 p-1 rounded" title="Delete">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {filteredInstitutions.length === 0 && (
+              <div className="text-center py-8">
+                <Building2 className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                <p className="text-slate-500">No institutions found matching your filters.</p>
+                <button onClick={() => setShowTable(false)} className="text-purple-600 hover:text-purple-800 text-sm font-medium mt-2">
                   Create your first institution →
                 </button>
-              )}
-            </div>
-          )}
-        </div>
+              </div>
+            )}
+          </div>
+        </SearchableRecords>
       )}
       <ConfirmDialog
   isOpen={dialogState.isOpen}

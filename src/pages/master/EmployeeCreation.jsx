@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Users, User, Briefcase, Building, Wallet, CreditCard, Eye, Search, Edit, Trash2, Plus, Save, FileText, UserCheck } from 'lucide-react';
+import { Users, User, Briefcase, Building, Wallet, CreditCard, Eye, Edit, Trash2, Plus, Save, FileText, UserCheck } from 'lucide-react';
+import SearchableRecords from '../../components/common/SearchableRecords';
 import { FormField } from "../../components/common/FormField";
 import SearchableDropdown from "../../components/common/SearchableDropdown";
 import { employeeService, fundService } from "../../services/realServices";
@@ -25,8 +26,9 @@ const EmployeeCreation = () => {
   const [funds, setFunds] = useState([]);
   const [showTable, setShowTable] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchFilters, setSearchFilters] = useState({ searchTerm: '', designation: '', section: '', fundType: '' });
   const [submitLoading, setSubmitLoading] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
 
   const { executeApi, loading, error, clearError } = useApiService();
 
@@ -250,25 +252,52 @@ const handleDelete = async (id) => {
   //   }
   // };
 
-  const handleSearch = async () => {
-    if (searchTerm.trim()) {
-      const result = await executeApi(employeeService.search, searchTerm);
-      if (result.success) {
-        setEmployees(result.data || []);
-      }
+  const filteredEmployees = employees.filter(employee => {
+    const f = searchFilters;
+    const searchMatch = !f.searchTerm ||
+      employee.empId?.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
+      employee.employeeName?.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
+      employee.designation?.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
+      employee.pfCpsNo?.toLowerCase().includes(f.searchTerm.toLowerCase());
+    const designationMatch = !f.designation || employee.designation?.toLowerCase().includes(f.designation.toLowerCase());
+    const sectionMatch = !f.section || employee.section === f.section;
+    const fundTypeMatch = !f.fundType || employee.fundType === f.fundType;
+    return searchMatch && designationMatch && sectionMatch && fundTypeMatch;
+  });
+
+  const handleSelectAll = () => {
+    if (filteredEmployees.every(item => selectedIds.has(item.id))) {
+      setSelectedIds(new Set());
     } else {
-      await loadEmployees();
+      setSelectedIds(new Set(filteredEmployees.map(item => item.id)));
     }
   };
 
-  const filteredEmployees = employees.filter(employee =>
-    employee.empId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    employee.employeeName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    employee.designation?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    getSectionLabel(employee.section)?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    getFundName(employee.fundType)?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    employee.pfCpsNo?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const handleSelectItem = (id) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) { next.delete(id); } else { next.add(id); }
+    setSelectedIds(next);
+  };
+
+  const handleBulkDelete = async () => {
+    const confirmed = await showConfirmDialog({
+      title: 'Delete Selected',
+      message: `Are you sure you want to delete ${selectedIds.size} selected record(s)? This action cannot be undone.`,
+      confirmText: 'Delete All',
+      cancelText: 'Cancel',
+      type: 'error'
+    });
+    if (confirmed) {
+      let count = 0;
+      for (const id of selectedIds) {
+        const result = await executeApi(employeeService.delete, id);
+        if (result.success) count++;
+      }
+      setSelectedIds(new Set());
+      await loadEmployees();
+      showToast(`${count} record(s) deleted successfully!`, 'success');
+    }
+  };
 
   // Get section label for display
   const getSectionLabel = (value) => {
@@ -449,27 +478,81 @@ const handleDelete = async (id) => {
 
       {/* Employees List */}
       {showTable && (
-        <div className="bg-white/60 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200/60 overflow-hidden">
-          <div className="bg-gradient-to-r from-indigo-500 to-purple-500 px-6 py-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-white">Employee Records ({employees.length})</h2>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search employees..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2 bg-white/20 backdrop-blur-sm border border-white/30 rounded-lg text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/50"
-                />
+        <SearchableRecords
+          title="Employee Records"
+          totalRecords={filteredEmployees.length}
+          searchFilters={searchFilters}
+          onFiltersChange={setSearchFilters}
+          loading={loading}
+          gradientFrom="from-indigo-500"
+          gradientTo="to-purple-500"
+          searchPlaceholder="Search by ID, name, designation, PF/CPS..."
+          filterConfig={{ dateRange: false, amountRange: false, fromWhom: false, fundType: false, status: false, transactionMode: false }}
+          customFilters={[
+            { key: 'designation', label: 'Designation', type: 'text', placeholder: 'Filter by designation' },
+            {
+              key: 'section',
+              label: 'Section',
+              type: 'select',
+              options: [
+                { value: '', label: 'All Sections' },
+                { value: 'general', label: 'General Section' },
+                { value: 'admin', label: 'Admin Section' },
+                { value: 'finance', label: 'Finance Section' },
+                { value: 'establishment', label: 'Establishment Section' },
+                { value: 'revenue', label: 'Revenue Section' },
+                { value: 'water_supply', label: 'Water Supply Section' },
+                { value: 'engineering', label: 'Engineering Section' },
+                { value: 'town_planning', label: 'Town Planning Section' },
+                { value: 'public_health', label: 'Public Health Section' },
+                { value: 'other', label: 'Other Section' },
+              ],
+            },
+            {
+              key: 'fundType',
+              label: 'Fund Type',
+              type: 'select',
+              options: [
+                { value: '', label: 'All Funds' },
+                ...funds.map(f => ({ value: f.id, label: f.fundName })),
+              ],
+            },
+          ]}
+        >
+          {selectedIds.size > 0 && (
+            <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-4">
+              <span className="text-sm font-medium text-red-700">
+                {selectedIds.size} record(s) selected
+              </span>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setSelectedIds(new Set())}
+                  className="text-sm text-gray-600 hover:text-gray-900 px-3 py-1.5 border border-gray-300 rounded-lg bg-white"
+                >
+                  Clear
+                </button>
+                <button
+                  onClick={handleBulkDelete}
+                  className="flex items-center space-x-2 bg-red-600 hover:bg-red-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Delete Selected ({selectedIds.size})</span>
+                </button>
               </div>
             </div>
-          </div>
-          
+          )}
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-slate-50">
                 <tr>
+                  <th className="px-4 py-3 w-10">
+                    <input
+                      type="checkbox"
+                      checked={filteredEmployees.length > 0 && filteredEmployees.every(item => selectedIds.has(item.id))}
+                      onChange={handleSelectAll}
+                      className="rounded"
+                    />
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Employee ID</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Name</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Designation</th>
@@ -482,39 +565,25 @@ const handleDelete = async (id) => {
               <tbody className="bg-white/40 divide-y divide-slate-200">
                 {filteredEmployees.map((employee) => (
                   <tr key={employee.id} className="hover:bg-white/60 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="text-sm font-medium text-slate-900">{employee.empId}</div>
+                    <td className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(employee.id)}
+                        onChange={() => handleSelectItem(employee.id)}
+                        className="rounded"
+                      />
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm font-medium text-slate-900">{employee.employeeName}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-slate-900">{employee.designation}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-slate-900">
-                        {getSectionLabel(employee.section)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-slate-900">{getFundName(employee.fundType)}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-slate-900">{employee.pfCpsNo}</div>
-                    </td>
+                    <td className="px-6 py-4"><div className="text-sm font-medium text-slate-900">{employee.empId}</div></td>
+                    <td className="px-6 py-4"><div className="text-sm font-medium text-slate-900">{employee.employeeName}</div></td>
+                    <td className="px-6 py-4"><div className="text-sm text-slate-900">{employee.designation}</div></td>
+                    <td className="px-6 py-4"><div className="text-sm text-slate-900">{getSectionLabel(employee.section)}</div></td>
+                    <td className="px-6 py-4"><div className="text-sm text-slate-900">{getFundName(employee.fundType)}</div></td>
+                    <td className="px-6 py-4"><div className="text-sm text-slate-900">{employee.pfCpsNo}</div></td>
                     <td className="px-6 py-4 text-sm font-medium space-x-2">
-                      <button
-                        onClick={() => handleEdit(employee)}
-                        className="text-blue-600 hover:text-blue-900 p-1 rounded"
-                        title="Edit"
-                      >
+                      <button onClick={() => handleEdit(employee)} className="text-blue-600 hover:text-blue-900 p-1 rounded" title="Edit">
                         <Edit className="h-4 w-4" />
                       </button>
-                      <button
-                        onClick={() => handleDelete(employee.id)}
-                        className="text-red-600 hover:text-red-900 p-1 rounded"
-                        title="Delete"
-                      >
+                      <button onClick={() => handleDelete(employee.id)} className="text-red-600 hover:text-red-900 p-1 rounded" title="Delete">
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </td>
@@ -522,25 +591,17 @@ const handleDelete = async (id) => {
                 ))}
               </tbody>
             </table>
-          </div>
-          
-          {filteredEmployees.length === 0 && (
-            <div className="text-center py-8">
-              <Users className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-              <p className="text-slate-500">
-                {searchTerm ? 'No employees found matching your search.' : 'No employees created yet.'}
-              </p>
-              {!searchTerm && (
-                <button
-                  onClick={() => setShowTable(false)}
-                  className="text-purple-600 hover:text-purple-800 text-sm font-medium mt-2"
-                >
+            {filteredEmployees.length === 0 && (
+              <div className="text-center py-8">
+                <Users className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                <p className="text-slate-500">No employees found matching your filters.</p>
+                <button onClick={() => setShowTable(false)} className="text-purple-600 hover:text-purple-800 text-sm font-medium mt-2">
                   Create your first employee →
                 </button>
-              )}
-            </div>
-          )}
-        </div>
+              </div>
+            )}
+          </div>
+        </SearchableRecords>
       )}
       <ConfirmDialog
   isOpen={dialogState.isOpen}

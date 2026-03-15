@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Gift, DollarSign, Calendar, FileText, Building, Save, Plus, Edit, Trash2, Eye, Search, CreditCard, Receipt } from 'lucide-react';
+import { Gift, DollarSign, Calendar, FileText, Building, Save, Plus, Edit, Trash2, Eye, CreditCard, Receipt } from 'lucide-react';
 import { FormField } from "../../components/common/FormField";
 import SearchableDropdown from "../../components/common/SearchableDropdown";
 import { sfcGrantService } from "../../services/realServices";
@@ -8,6 +8,7 @@ import { ErrorDisplay } from '../../components/common/ErrorDisplay';
 import { ConfirmDialog, useConfirmDialog } from "../../components/common/Popup";
 import { VoiceInputField } from '../../components/common/VoiceInputField';
 import { useAuth } from '../../context/AuthContext';
+import SearchableRecords from '../../components/common/SearchableRecords';
 const SFCGrantDetails = () => {
   const { dialogState, showConfirmDialog, closeDialog } = useConfirmDialog();
   const { getWorkspaceSelection } = useAuth();
@@ -35,7 +36,7 @@ const SFCGrantDetails = () => {
   const [grants, setGrants] = useState([]);
   const [showTable, setShowTable] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchFilters, setSearchFilters] = useState({ searchTerm: '', transactionType: '', fundType: '' });
   const [submitLoading, setSubmitLoading] = useState(false);
 
   const { executeApi, loading, error, clearError } = useApiService();
@@ -317,11 +318,17 @@ const handleDelete = async (id) => {
   //   }
   // };
 
-  const filteredGrants = grants.filter(grant =>
-    grant.voucherNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    grant.fundName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    grant.referenceNoAndDate?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredGrants = grants.filter(grant => {
+    const { searchTerm, transactionType, fundType } = searchFilters;
+    const matchesSearch = !searchTerm ||
+      grant.voucherNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      grant.fundName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      grant.referenceNoAndDate?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      grant.year?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesTransactionType = !transactionType || grant.transactionType === transactionType;
+    const matchesFundType = !fundType || grant.fundType === fundType;
+    return matchesSearch && matchesTransactionType && matchesFundType;
+  });
 
   const getDropdownLabel = (options, value) => {
     const found = options.find(option => option.value === value);
@@ -632,27 +639,46 @@ const handleDelete = async (id) => {
 
       {/* Grants List */}
       {showTable && (
-        <div className="bg-white/60 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200/60 overflow-hidden">
-          <div className="bg-gradient-to-r from-purple-500 to-indigo-500 px-6 py-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-white">Grant Records ({grants.length})</h2>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search grants..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2 bg-white/20 backdrop-blur-sm border border-white/30 rounded-lg text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/50"
-                />
-              </div>
-            </div>
-          </div>
-          
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-              <span className="ml-2 text-slate-600">Loading grants...</span>
+        <SearchableRecords
+          title="Grant Records"
+          totalRecords={filteredGrants.length}
+          searchFilters={searchFilters}
+          onFiltersChange={(f) => setSearchFilters(f)}
+          loading={loading}
+          gradientFrom="from-purple-500"
+          gradientTo="to-indigo-500"
+          searchPlaceholder="Search by voucher no, fund name, or reference..."
+          filterConfig={{ dateRange: true, amountRange: true, fromWhom: false, fundType: false, status: false, transactionMode: false }}
+          customFilters={[
+            {
+              key: 'transactionType',
+              label: 'Transaction Type',
+              type: 'select',
+              icon: Receipt,
+              options: [
+                { value: '', label: 'All Types' },
+                { value: 'receipt', label: 'Receipt' },
+                { value: 'utilization', label: 'Utilization' },
+                { value: 'adjustment', label: 'Adjustment' },
+                { value: 'refund', label: 'Refund' },
+              ]
+            }
+          ]}
+        >
+          {filteredGrants.length === 0 ? (
+            <div className="text-center py-8">
+              <Gift className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+              <p className="text-slate-500">
+                {searchFilters.searchTerm || searchFilters.transactionType ? 'No grants found matching your search.' : 'No grants created yet.'}
+              </p>
+              {!searchFilters.searchTerm && !searchFilters.transactionType && (
+                <button
+                  onClick={() => setShowTable(false)}
+                  className="text-purple-600 hover:text-purple-800 text-sm font-medium mt-2"
+                >
+                  Create your first grant →
+                </button>
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -730,24 +756,7 @@ const handleDelete = async (id) => {
               </table>
             </div>
           )}
-          
-          {!loading && filteredGrants.length === 0 && (
-            <div className="text-center py-8">
-              <Gift className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-              <p className="text-slate-500">
-                {searchTerm ? 'No grants found matching your search.' : 'No grants created yet.'}
-              </p>
-              {!searchTerm && (
-                <button
-                  onClick={() => setShowTable(false)}
-                  className="text-purple-600 hover:text-purple-800 text-sm font-medium mt-2"
-                >
-                  Create your first grant →
-                </button>
-              )}
-            </div>
-          )}
-        </div>
+        </SearchableRecords>
       )}
       <ConfirmDialog
   isOpen={dialogState.isOpen}

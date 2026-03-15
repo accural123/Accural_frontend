@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calculator, FileText, AlertCircle, CheckCircle, Plus, Save, RefreshCw, AlertTriangle, Hash } from 'lucide-react';
+import { Calculator, FileText, AlertCircle, CheckCircle, Plus, Save, RefreshCw, AlertTriangle, Hash, Trash2 } from 'lucide-react';
 
 // Import your existing components
 import { Card } from "../../components/common/Card";
@@ -16,6 +16,7 @@ import { useToast } from "../../hooks/useToast"; // Assuming you have this hook
 import { ConfirmDialog, useConfirmDialog } from "../../components/common/Popup";
 import { ErrorDisplay } from '../../components/common/ErrorDisplay';
 import { useAuth } from '../../context/AuthContext';
+import SearchableRecords from '../../components/common/SearchableRecords';
 
 
 const OpeningBalance = () => {
@@ -34,6 +35,10 @@ const OpeningBalance = () => {
   const [editingEntryId, setEditingEntryId] = useState(null);
   const [editingSavedId, setEditingSavedId] = useState(null);
   const [showSavedBalances, setShowSavedBalances] = useState(false);
+  const [searchFilters, setSearchFilters] = useState({ searchTerm: '', balanceType: '' });
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 20;
+  const [selectedIds, setSelectedIds] = useState(new Set());
 
   const { executeApi, loading, error, clearError } = useApiService();
   const { toasts, showToast, removeToast } = useToast(); // Your existing toast hook
@@ -364,6 +369,55 @@ const OpeningBalance = () => {
   const isBalanced = debitTotal === creditTotal;
   const difference = Math.abs(debitTotal - creditTotal);
 
+  const filteredSavedBalances = savedOpeningBalances.filter(balance => {
+    const { searchTerm, balanceType } = searchFilters;
+    const matchesSearch = !searchTerm ||
+      balance.accountCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      balance.accountHead?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      balance.financialYear?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesType = !balanceType || balance.type === balanceType;
+    return matchesSearch && matchesType;
+  });
+  const totalPages = Math.ceil(filteredSavedBalances.length / ITEMS_PER_PAGE);
+  const paginatedSavedBalances = filteredSavedBalances.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  const handleSelectAll = () => {
+    if (paginatedSavedBalances.every(item => selectedIds.has(item.id))) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(paginatedSavedBalances.map(item => item.id)));
+    }
+  };
+
+  const handleSelectItem = (id) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) { next.delete(id); } else { next.add(id); }
+    setSelectedIds(next);
+  };
+
+  const handleBulkDelete = async () => {
+    const confirmed = await showConfirmDialog({
+      title: 'Delete Selected',
+      message: `Are you sure you want to delete ${selectedIds.size} selected record(s)? This action cannot be undone.`,
+      confirmText: 'Delete All',
+      cancelText: 'Cancel',
+      type: 'error'
+    });
+    if (confirmed) {
+      let count = 0;
+      for (const id of selectedIds) {
+        const result = await executeApi(openingBalanceService.delete, id);
+        if (result.success) count++;
+      }
+      setSelectedIds(new Set());
+      await loadSavedOpeningBalances();
+      showToast(`${count} record(s) deleted successfully!`, 'success');
+    }
+  };
+
   // Updated columns with separate Debit and Credit amounts
   const columns = [
     { key: 'ledgerCode', title: 'Ledger Code', sortable: true },
@@ -424,61 +478,121 @@ const OpeningBalance = () => {
 
       {/* Saved Opening Balances */}
       {showSavedBalances && (
-        <div className="bg-white/60  backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200/60 overflow-hidden">
-          <div className="bg-gradient-to-r from-purple-500 to-pink-500 px-6 py-4">
-            <h2 className="text-xl font-semibold text-white">Saved Opening Balances</h2>
-          </div>
-          <div className="p-6">
-            {savedOpeningBalances.length === 0 ? (
-              <div className="text-center py-8">
-                <FileText className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-                <p className="text-slate-500">No saved opening balances found.</p>
+        <SearchableRecords
+          title="Saved Opening Balances"
+          totalRecords={filteredSavedBalances.length}
+          searchFilters={searchFilters}
+          onFiltersChange={(f) => { setSearchFilters(f); setCurrentPage(1); }}
+          loading={loading}
+          gradientFrom="from-purple-500"
+          gradientTo="to-pink-500"
+          searchPlaceholder="Search by ledger code, account head, or financial year..."
+          filterConfig={{ dateRange: false, amountRange: false, fromWhom: false, fundType: false, status: false, transactionMode: false }}
+          customFilters={[
+            {
+              key: 'balanceType',
+              label: 'Balance Type',
+              type: 'select',
+              icon: FileText,
+              options: [
+                { value: '', label: 'All Types' },
+                { value: 'Debit', label: 'Debit' },
+                { value: 'Credit', label: 'Credit' },
+              ]
+            }
+          ]}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          pageSize={ITEMS_PER_PAGE}
+        >
+          {selectedIds.size > 0 && (
+            <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-4">
+              <span className="text-sm font-medium text-red-700">
+                {selectedIds.size} record(s) selected
+              </span>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setSelectedIds(new Set())}
+                  className="text-sm text-gray-600 hover:text-gray-900 px-3 py-1.5 border border-gray-300 rounded-lg bg-white"
+                >
+                  Clear
+                </button>
+                <button
+                  onClick={handleBulkDelete}
+                  className="flex items-center space-x-2 bg-red-600 hover:bg-red-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Delete Selected ({selectedIds.size})</span>
+                </button>
               </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-slate-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Ledger Code</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Account Head</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Type</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Amount</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Financial Year</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Date</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Actions</th>
+            </div>
+          )}
+          {filteredSavedBalances.length === 0 ? (
+            <div className="text-center py-8">
+              <FileText className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+              <p className="text-slate-500">No saved opening balances found.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="px-4 py-3 w-10">
+                      <input
+                        type="checkbox"
+                        checked={paginatedSavedBalances.length > 0 && paginatedSavedBalances.every(item => selectedIds.has(item.id))}
+                        onChange={handleSelectAll}
+                        className="rounded"
+                      />
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Ledger Code</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Account Head</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Type</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Amount</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Financial Year</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Date</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white/40 divide-y divide-slate-200">
+                  {paginatedSavedBalances.map((balance) => (
+                    <tr key={balance.id} className="hover:bg-white/60 transition-colors">
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(balance.id)}
+                          onChange={() => handleSelectItem(balance.id)}
+                          className="rounded"
+                        />
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-900">{balance.accountCode || '-'}</td>
+                      <td className="px-6 py-4 text-sm text-slate-900">{balance.accountHead || '-'}</td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          balance.type === 'Debit' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
+                        }`}>
+                          {balance.type}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-900">
+                        ₹{Number(balance.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-500">{balance.financialYear || '-'}</td>
+                      <td className="px-6 py-4 text-sm text-slate-500">
+                        {balance.createdDate ? new Date(balance.createdDate).toLocaleDateString() : '-'}
+                      </td>
+                      <td className="px-6 py-4 text-sm font-medium space-x-3">
+                        <button onClick={() => handleEditSaved(balance)} className="text-blue-600 hover:text-blue-900">Edit</button>
+                        <button onClick={() => handleDeleteSaved(balance)} className="text-red-600 hover:text-red-900">Delete</button>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="bg-white/40 divide-y divide-slate-200">
-                    {savedOpeningBalances.map((balance) => (
-                      <tr key={balance.id} className="hover:bg-white/60 transition-colors">
-                        <td className="px-6 py-4 text-sm text-slate-900">{balance.accountCode || '-'}</td>
-                        <td className="px-6 py-4 text-sm text-slate-900">{balance.accountHead || '-'}</td>
-                        <td className="px-6 py-4">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            balance.type === 'Debit' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
-                          }`}>
-                            {balance.type}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-slate-900">
-                          ₹{Number(balance.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-slate-500">{balance.financialYear || '-'}</td>
-                        <td className="px-6 py-4 text-sm text-slate-500">
-                          {balance.createdDate ? new Date(balance.createdDate).toLocaleDateString() : '-'}
-                        </td>
-                        <td className="px-6 py-4 text-sm font-medium space-x-3">
-                          <button onClick={() => handleEditSaved(balance)} className="text-blue-600 hover:text-blue-900">Edit</button>
-                          <button onClick={() => handleDeleteSaved(balance)} className="text-red-600 hover:text-red-900">Delete</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </SearchableRecords>
       )}
 
       {/* Main Form */}

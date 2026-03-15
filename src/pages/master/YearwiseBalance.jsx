@@ -6,23 +6,24 @@ import { SubmitButton } from "../../components/common/SubmitButton";
 import { DataTable } from "../../components/common/DataTable";
 import { yearwiseBalanceService, fundService } from "../../services/realServices";
 import { useApiService } from "../../hooks/useApiService";
-import { Calculator, TrendingUp, AlertCircle, CheckCircle, Plus, Save, RefreshCw, Eye, FileText, Search, BarChart3, Wallet } from 'lucide-react';
+import { Calculator, TrendingUp, AlertCircle, CheckCircle, Plus, Save, RefreshCw, Eye, FileText, BarChart3, Wallet, Trash2, Edit3 } from 'lucide-react';
 import { ErrorDisplay } from '../../components/common/ErrorDisplay';
 import SearchableDropdown from '../../components/common/SearchableDropdown';
 import { ConfirmDialog, useConfirmDialog } from "../../components/common/Popup";
-import Pagination from '../../components/common/Pagination';
+import SearchableRecords from '../../components/common/SearchableRecords';
 const ITEMS_PER_PAGE = 20;
 
 const YearwiseBalance = () => {
   const { dialogState, showConfirmDialog, closeDialog } = useConfirmDialog();
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedFundType, setSelectedFundType] = useState('');
+  const [selectedIds, setSelectedIds] = useState(new Set());
   const [selectedTaxType, setSelectedTaxType] = useState('Property Tax');
   const [balanceData, setBalanceData] = useState([]);
   const [savedRecords, setSavedRecords] = useState([]);
   const [showRecords, setShowRecords] = useState(false);
   const [editingRecordId, setEditingRecordId] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchFilters, setSearchFilters] = useState({ searchTerm: '', taxType: '' });
   const [availableFunds, setAvailableFunds] = useState([]);
   const [newEntry, setNewEntry] = useState({
     year: '',
@@ -280,8 +281,8 @@ const handleDeleteRecord = async (id) => {
 
 
   const handleSearch = async () => {
-    if (searchTerm.trim()) {
-      const result = await executeApi(yearwiseBalanceService.search, searchTerm);
+    if (searchFilters.searchTerm.trim()) {
+      const result = await executeApi(yearwiseBalanceService.search, searchFilters.searchTerm);
       if (result.success) {
         setSavedRecords(result.data || []);
       }
@@ -313,18 +314,56 @@ const handleDeleteRecord = async (id) => {
       : 0
   };
 
-  const filteredRecords = savedRecords.filter(record =>
-    record.fundType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    record.taxType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    record.year?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    record.financialYear?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredRecords = savedRecords.filter(record => {
+    const { searchTerm, taxType } = searchFilters;
+    const matchesSearch = !searchTerm ||
+      record.fundType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      record.taxType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      record.year?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      record.financialYear?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesTaxType = !taxType || record.taxType === taxType;
+    return matchesSearch && matchesTaxType;
+  });
 
   const totalPages = Math.ceil(filteredRecords.length / ITEMS_PER_PAGE);
   const paginatedRecords = filteredRecords.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   );
+
+  const handleSelectAll = () => {
+    if (paginatedRecords.every(item => selectedIds.has(item.id))) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(paginatedRecords.map(item => item.id)));
+    }
+  };
+
+  const handleSelectItem = (id) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) { next.delete(id); } else { next.add(id); }
+    setSelectedIds(next);
+  };
+
+  const handleBulkDelete = async () => {
+    const confirmed = await showConfirmDialog({
+      title: 'Delete Selected',
+      message: `Are you sure you want to delete ${selectedIds.size} selected record(s)? This action cannot be undone.`,
+      confirmText: 'Delete All',
+      cancelText: 'Cancel',
+      type: 'error'
+    });
+    if (confirmed) {
+      let count = 0;
+      for (const id of selectedIds) {
+        const result = await executeApi(yearwiseBalanceService.delete, id);
+        if (result.success) count++;
+      }
+      setSelectedIds(new Set());
+      await loadSavedRecords();
+      showToast(`${count} record(s) deleted successfully!`, 'success');
+    }
+  };
 
   const columns = [
     { key: 'slNo', title: 'Sl.No', sortable: true },
@@ -415,67 +454,154 @@ const handleDeleteRecord = async (id) => {
       </div>
 
       {showRecords && (
-        <div className="bg-white/60 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200/60 overflow-hidden">
-          <div className="bg-gradient-to-r from-purple-500 to-pink-500 px-6 py-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-white">Saved Yearwise Balance Records ({savedRecords.length})</h2>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search records..."
-                  value={searchTerm}
-                  onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                  className="pl-10 pr-4 py-2 bg-white/20 backdrop-blur-sm border border-white/30 rounded-lg text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/50"
-                />
+        <SearchableRecords
+          title="Saved Yearwise Balance Records"
+          totalRecords={filteredRecords.length}
+          searchFilters={searchFilters}
+          onFiltersChange={(f) => { setSearchFilters(f); setCurrentPage(1); }}
+          loading={loading}
+          gradientFrom="from-purple-500"
+          gradientTo="to-pink-500"
+          searchPlaceholder="Search by fund type, tax type, or year..."
+          filterConfig={{ dateRange: false, amountRange: false, fromWhom: false, fundType: false, status: false, transactionMode: false }}
+          customFilters={[
+            {
+              key: 'taxType',
+              label: 'Tax Type',
+              type: 'select',
+              icon: BarChart3,
+              options: [
+                { value: '', label: 'All Tax Types' },
+                { value: 'Property Tax', label: 'Property Tax' },
+                { value: 'Water Charges', label: 'Water Charges' },
+                { value: 'Profession Tax', label: 'Profession Tax' },
+                { value: 'MDR', label: 'MDR' },
+                { value: 'SWM User Charges', label: 'SWM User Charges' },
+                { value: 'UGD User Charges', label: 'UGD User Charges' },
+                { value: 'Trade License Fee', label: 'Trade License Fee' },
+                { value: 'Building Plan Approval Fee', label: 'Building Plan Approval Fee' },
+              ]
+            }
+          ]}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          pageSize={ITEMS_PER_PAGE}
+        >
+          {selectedIds.size > 0 && (
+            <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-4">
+              <span className="text-sm font-medium text-red-700">
+                {selectedIds.size} record(s) selected
+              </span>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setSelectedIds(new Set())}
+                  className="text-sm text-gray-600 hover:text-gray-900 px-3 py-1.5 border border-gray-300 rounded-lg bg-white"
+                >
+                  Clear
+                </button>
+                <button
+                  onClick={handleBulkDelete}
+                  className="flex items-center space-x-2 bg-red-600 hover:bg-red-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Delete Selected ({selectedIds.size})</span>
+                </button>
               </div>
             </div>
-          </div>
-          
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-              <span className="ml-2 text-slate-600">Loading records...</span>
+          )}
+          {filteredRecords.length === 0 ? (
+            <div className="text-center py-8">
+              <BarChart3 className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+              <p className="text-slate-500">
+                {searchFilters.searchTerm || searchFilters.taxType ? 'No records found matching your search.' : 'No yearwise balance records found.'}
+              </p>
+              {!searchFilters.searchTerm && !searchFilters.taxType && (
+                <button
+                  onClick={() => setShowRecords(false)}
+                  className="text-purple-600 hover:text-purple-800 text-sm font-medium mt-2"
+                >
+                  Create your first record →
+                </button>
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
-              {filteredRecords.length === 0 ? (
-                <div className="text-center py-8">
-                  <BarChart3 className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-                  <p className="text-slate-500">
-                    {searchTerm ? 'No records found matching your search.' : 'No yearwise balance records found.'}
-                  </p>
-                  {!searchTerm && (
-                    <button
-                      onClick={() => setShowRecords(false)}
-                      className="text-purple-600 hover:text-purple-800 text-sm font-medium mt-2"
-                    >
-                      Create your first record →
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <>
-                  <DataTable
-                    columns={recordColumns}
-                    data={paginatedRecords}
-                    onEdit={handleEditRecord}
-                    onDelete={handleDeleteRecord}
-                  />
-                  {totalPages > 1 && (
-                    <Pagination
-                      currentPage={currentPage}
-                      totalPages={totalPages}
-                      onPageChange={setCurrentPage}
-                      pageSize={ITEMS_PER_PAGE}
-                    />
-                  )}
-                </>
-              )}
+              <table className="w-full">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="px-4 py-3 w-10">
+                      <input
+                        type="checkbox"
+                        checked={paginatedRecords.length > 0 && paginatedRecords.every(item => selectedIds.has(item.id))}
+                        onChange={handleSelectAll}
+                        className="rounded"
+                      />
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Fund Type</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Tax Type</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Year</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Demand (₹)</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Collection (₹)</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Balance (₹)</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Efficiency %</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white/40 divide-y divide-slate-200">
+                  {paginatedRecords.map((record) => {
+                    const eff = record.collectionEfficiency != null ? Number(record.collectionEfficiency) : null;
+                    return (
+                      <tr key={record.id} className="hover:bg-white/60 transition-colors">
+                        <td className="px-4 py-3">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(record.id)}
+                            onChange={() => handleSelectItem(record.id)}
+                            className="rounded"
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-sm text-slate-900">{record.fundType}</td>
+                        <td className="px-4 py-3 text-sm text-slate-900">{record.taxType}</td>
+                        <td className="px-4 py-3 text-sm text-slate-900">{record.financialYear || record.year || '—'}</td>
+                        <td className="px-4 py-3 text-sm text-slate-900">{record.demand != null ? Number(record.demand).toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '—'}</td>
+                        <td className="px-4 py-3 text-sm text-slate-900">{record.collection != null ? Number(record.collection).toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '—'}</td>
+                        <td className="px-4 py-3 text-sm text-slate-900">{record.balance != null ? Number(record.balance).toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '—'}</td>
+                        <td className="px-4 py-3 text-sm">
+                          {eff == null ? '—' : (
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${
+                              eff >= 100 ? 'bg-purple-100 text-purple-800' :
+                              eff >= 80 ? 'bg-green-100 text-green-800' :
+                              eff >= 60 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
+                            }`}>
+                              {eff.toFixed(1)}%
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-sm font-medium space-x-2">
+                          <button
+                            onClick={() => handleEditRecord(record)}
+                            className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50"
+                            title="Edit"
+                          >
+                            <Edit3 className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteRecord(record.id)}
+                            className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
-        </div>
+        </SearchableRecords>
       )}
 
       {!showRecords && (

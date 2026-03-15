@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  History, 
-  Calendar, 
+  History,
+  Calendar,
   FileText,
   DollarSign,
   CheckCircle,
@@ -11,8 +11,7 @@ import {
   Eye,
   Wallet,
   Edit3,
-  Building,
-  Search
+  Building
 } from 'lucide-react';
 
 // Import components
@@ -57,11 +56,12 @@ const PreviousReconciliation = () => {
   };
 
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedIds, setSelectedIds] = useState(new Set());
   const [formData, setFormData] = useState(initialFormData);
   const [savedReconciliations, setSavedReconciliations] = useState([]);
   const [showRecords, setShowRecords] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchFilters, setSearchFilters] = useState({ searchTerm: '', transactionType: '', voucherType: '' });
   const [availableFunds, setAvailableFunds] = useState([]);
   const [errors, setErrors] = useState({});
 
@@ -323,22 +323,60 @@ const PreviousReconciliation = () => {
     }
   };
 
-  const filteredReconciliations = savedReconciliations.filter(reconciliation =>
-    reconciliation.fundType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    reconciliation.month?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    reconciliation.bankCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    reconciliation.voucherType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    reconciliation.voucherNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    reconciliation.transactionType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    reconciliation.chequeNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    reconciliation.description ?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredReconciliations = savedReconciliations.filter(reconciliation => {
+    const { searchTerm, transactionType, voucherType } = searchFilters;
+    const matchesSearch = !searchTerm ||
+      reconciliation.fundType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      reconciliation.month?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      reconciliation.bankCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      reconciliation.voucherType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      reconciliation.voucherNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      reconciliation.transactionType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      reconciliation.chequeNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      reconciliation.description?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesTransactionType = !transactionType || reconciliation.transactionType === transactionType;
+    const matchesVoucherType = !voucherType || reconciliation.voucherType === voucherType;
+    return matchesSearch && matchesTransactionType && matchesVoucherType;
+  });
 
   const totalPages = Math.ceil(filteredReconciliations.length / ITEMS_PER_PAGE);
   const paginatedReconciliations = filteredReconciliations.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   );
+
+  const handleSelectAll = () => {
+    if (paginatedReconciliations.every(item => selectedIds.has(item.id))) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(paginatedReconciliations.map(item => item.id)));
+    }
+  };
+
+  const handleSelectItem = (id) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) { next.delete(id); } else { next.add(id); }
+    setSelectedIds(next);
+  };
+
+  const handleBulkDelete = async () => {
+    const confirmed = await showConfirmDialog(
+      'Delete Selected',
+      `Are you sure you want to delete ${selectedIds.size} selected record(s)? This action cannot be undone.`,
+      'Delete All',
+      'Cancel'
+    );
+    if (confirmed) {
+      let count = 0;
+      for (const id of selectedIds) {
+        const result = await executeApi(reconciliationService.delete, id);
+        if (result.success) count++;
+      }
+      setSelectedIds(new Set());
+      await loadSavedReconciliations();
+      showToast(`${count} record(s) deleted successfully!`, 'success');
+    }
+  };
 
   const resetFormHandler = () => {
     resetForm();
@@ -371,24 +409,61 @@ const PreviousReconciliation = () => {
       {showRecords && (
         <SearchableRecords
           title="Saved Previous Reconciliations"
-          totalRecords={savedReconciliations.length}
-          searchTerm={searchTerm}
-          setSearchTerm={setSearchTerm}
+          totalRecords={filteredReconciliations.length}
+          searchFilters={searchFilters}
+          onFiltersChange={(f) => { setSearchFilters(f); setCurrentPage(1); }}
           loading={loading}
           gradientFrom="from-purple-500"
           gradientTo="to-pink-500"
+          searchPlaceholder="Search by fund type, bank code, voucher no, cheque no..."
+          filterConfig={{ dateRange: true, amountRange: true, fromWhom: false, fundType: false, status: false, transactionMode: false }}
+          customFilters={[
+            {
+              key: 'transactionType',
+              label: 'Transaction Type',
+              type: 'select',
+              icon: FileText,
+              options: [
+                { value: '', label: 'All Types' },
+                { value: 'debit', label: 'Debit' },
+                { value: 'credit', label: 'Credit' },
+              ]
+            }
+          ]}
           currentPage={currentPage}
           totalPages={totalPages}
           onPageChange={setCurrentPage}
           pageSize={ITEMS_PER_PAGE}
         >
+          {selectedIds.size > 0 && (
+            <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-4">
+              <span className="text-sm font-medium text-red-700">
+                {selectedIds.size} record(s) selected
+              </span>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setSelectedIds(new Set())}
+                  className="text-sm text-gray-600 hover:text-gray-900 px-3 py-1.5 border border-gray-300 rounded-lg bg-white"
+                >
+                  Clear
+                </button>
+                <button
+                  onClick={handleBulkDelete}
+                  className="flex items-center space-x-2 bg-red-600 hover:bg-red-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Delete Selected ({selectedIds.size})</span>
+                </button>
+              </div>
+            </div>
+          )}
           {filteredReconciliations.length === 0 ? (
             <EmptyState
               icon={History}
               title="No previous reconciliations found."
               actionText="Create your first reconciliation"
               onAction={() => setShowRecords(false)}
-              searchTerm={searchTerm}
+              searchTerm={searchFilters.searchTerm}
             />
           ) : (
             <div className="space-y-4">
@@ -399,6 +474,12 @@ const PreviousReconciliation = () => {
                 >
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center space-x-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(reconciliation.id)}
+                        onChange={() => handleSelectItem(reconciliation.id)}
+                        className="rounded"
+                      />
                       <div className="h-10 w-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
                         <History className="h-5 w-5 text-white" />
                       </div>

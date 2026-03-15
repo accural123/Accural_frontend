@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, DollarSign, Calendar, FileText, Building, Save, Plus, Edit, Trash2, Eye, Search, CreditCard, Percent, Clock } from 'lucide-react';
+import { TrendingUp, DollarSign, Calendar, FileText, Building, Save, Plus, Edit, Trash2, Eye, CreditCard, Percent, Clock } from 'lucide-react';
 import { FormField } from "../../components/common/FormField";
 import SearchableDropdown from "../../components/common/SearchableDropdown";
 import { investmentService } from "../../services/realServices";
@@ -8,6 +8,7 @@ import { ErrorDisplay } from '../../components/common/ErrorDisplay';
 import { ConfirmDialog, useConfirmDialog } from "../../components/common/Popup";
 import { VoiceInputField } from '../../components/common/VoiceInputField';
 import { useAuth } from '../../context/AuthContext';
+import SearchableRecords from '../../components/common/SearchableRecords';
 const InvestmentDetails = () => {
   const { dialogState, showConfirmDialog, closeDialog } = useConfirmDialog();
   const { getWorkspaceSelection } = useAuth();
@@ -47,7 +48,7 @@ const InvestmentDetails = () => {
   const [investments, setInvestments] = useState([]);
   const [showTable, setShowTable] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchFilters, setSearchFilters] = useState({ searchTerm: '', investmentStatus: '', fundType: '' });
   const [submitLoading, setSubmitLoading] = useState(false);
 
   const { executeApi, loading, error, clearError } = useApiService();
@@ -384,11 +385,17 @@ const InvestmentDetails = () => {
   //   }
   // };
 
-  const filteredInvestments = investments.filter(inv =>
-    inv.investmentSerialNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    inv.fundName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    inv.investorName?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredInvestments = investments.filter(inv => {
+    const { searchTerm, investmentStatus, fundType } = searchFilters;
+    const matchesSearch = !searchTerm ||
+      inv.investmentSerialNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      inv.fundName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      inv.investorName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      inv.nameOfBank?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = !investmentStatus || inv.investmentStatus === investmentStatus;
+    const matchesFundType = !fundType || inv.fundType === fundType;
+    return matchesSearch && matchesStatus && matchesFundType;
+  });
 
   const getDropdownLabel = (options, value) => {
     const found = options.find(option => option.value === value);
@@ -856,27 +863,46 @@ const InvestmentDetails = () => {
 
       {/* Investments List */}
       {showTable && (
-        <div className="bg-white/60 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200/60 overflow-hidden">
-          <div className="bg-gradient-to-r from-green-500 to-blue-500 px-6 py-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-white">Investment Records ({investments.length})</h2>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search investments..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2 bg-white/20 backdrop-blur-sm border border-white/30 rounded-lg text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/50"
-                />
-              </div>
-            </div>
-          </div>
-          
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
-              <span className="ml-2 text-slate-600">Loading investments...</span>
+        <SearchableRecords
+          title="Investment Records"
+          totalRecords={filteredInvestments.length}
+          searchFilters={searchFilters}
+          onFiltersChange={(f) => setSearchFilters(f)}
+          loading={loading}
+          gradientFrom="from-green-500"
+          gradientTo="to-blue-500"
+          searchPlaceholder="Search by serial no, fund name, investor, or bank..."
+          filterConfig={{ dateRange: false, amountRange: true, fromWhom: false, fundType: false, status: false, transactionMode: false }}
+          customFilters={[
+            {
+              key: 'investmentStatus',
+              label: 'Investment Status',
+              type: 'select',
+              icon: TrendingUp,
+              options: [
+                { value: '', label: 'All Status' },
+                { value: 'live', label: 'Live' },
+                { value: 'partially_closed', label: 'Partially Closed' },
+                { value: 'closed', label: 'Closed' },
+                { value: 'pre_maturity', label: 'Pre-Maturity' },
+              ]
+            }
+          ]}
+        >
+          {filteredInvestments.length === 0 ? (
+            <div className="text-center py-8">
+              <TrendingUp className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+              <p className="text-slate-500">
+                {searchFilters.searchTerm || searchFilters.investmentStatus ? 'No investments found matching your search.' : 'No investments created yet.'}
+              </p>
+              {!searchFilters.searchTerm && !searchFilters.investmentStatus && (
+                <button
+                  onClick={() => setShowTable(false)}
+                  className="text-green-600 hover:text-green-800 text-sm font-medium mt-2"
+                >
+                  Create your first investment →
+                </button>
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -930,8 +956,8 @@ const InvestmentDetails = () => {
                       </td>
                       <td className="px-6 py-4">
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          investment.investmentStatus === 'live' 
-                            ? 'bg-green-100 text-green-800' 
+                          investment.investmentStatus === 'live'
+                            ? 'bg-green-100 text-green-800'
                             : investment.investmentStatus === 'partially_closed'
                             ? 'bg-yellow-100 text-yellow-800'
                             : 'bg-red-100 text-red-800'
@@ -964,24 +990,7 @@ const InvestmentDetails = () => {
               </table>
             </div>
           )}
-          
-          {!loading && filteredInvestments.length === 0 && (
-            <div className="text-center py-8">
-              <TrendingUp className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-              <p className="text-slate-500">
-                {searchTerm ? 'No investments found matching your search.' : 'No investments created yet.'}
-              </p>
-              {!searchTerm && (
-                <button
-                  onClick={() => setShowTable(false)}
-                  className="text-green-600 hover:text-green-800 text-sm font-medium mt-2"
-                >
-                  Create your first investment →
-                </button>
-              )}
-            </div>
-          )}
-        </div>
+        </SearchableRecords>
       )}
       <ConfirmDialog
   isOpen={dialogState.isOpen}

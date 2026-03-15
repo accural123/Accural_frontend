@@ -77,6 +77,7 @@ const PayableDetails = () => {
   const [showMultipleEmployees, setShowMultipleEmployees] = useState(false);
   const [employeeEntries, setEmployeeEntries] = useState([]);
   const [availableFunds, setAvailableFunds] = useState([]);
+  const [selectedIds, setSelectedIds] = useState(new Set());
   
   // State variables for optional sections
   const [showWorkDetails, setShowWorkDetails] = useState(false);
@@ -629,6 +630,41 @@ const PayableDetails = () => {
     currentPage * ITEMS_PER_PAGE
   );
 
+  const handleSelectAll = () => {
+    if (paginatedRecords.every(item => selectedIds.has(item.id))) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(paginatedRecords.map(item => item.id)));
+    }
+  };
+
+  const handleSelectItem = (id) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) { next.delete(id); } else { next.add(id); }
+    setSelectedIds(next);
+  };
+
+  const handleBulkDelete = async () => {
+    const confirmed = await showConfirmDialog({
+      title: 'Delete Selected',
+      message: `Are you sure you want to delete ${selectedIds.size} selected record(s)? This action cannot be undone.`,
+      confirmText: 'Delete All',
+      cancelText: 'Cancel',
+      type: 'error'
+    });
+    if (confirmed) {
+      let count = 0;
+      for (const id of selectedIds) {
+        const result = await executeApi(payableService.delete, id);
+        if (result.success) count++;
+      }
+      setSelectedIds(new Set());
+      await loadSavedRecords();
+      await loadSummary();
+      showToast(`${count} record(s) deleted successfully!`, 'success');
+    }
+  };
+
   return (
     <div className="space-y-6">
       <ToastContainer toasts={toasts} removeToast={removeToast} />
@@ -688,6 +724,28 @@ const PayableDetails = () => {
             }
           ]}
         >
+          {selectedIds.size > 0 && (
+            <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-4">
+              <span className="text-sm font-medium text-red-700">
+                {selectedIds.size} record(s) selected
+              </span>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setSelectedIds(new Set())}
+                  className="text-sm text-gray-600 hover:text-gray-900 px-3 py-1.5 border border-gray-300 rounded-lg bg-white"
+                >
+                  Clear
+                </button>
+                <button
+                  onClick={handleBulkDelete}
+                  className="flex items-center space-x-2 bg-red-600 hover:bg-red-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Delete Selected ({selectedIds.size})</span>
+                </button>
+              </div>
+            </div>
+          )}
           {filteredRecords.length === 0 ? (
             <EmptyState
               icon={CreditCard}
@@ -698,11 +756,31 @@ const PayableDetails = () => {
             />
           ) : (
             <div className="space-y-4">
+              {paginatedRecords.length > 0 && (
+                <div className="flex items-center px-2 pb-2 border-b border-gray-200">
+                  <input
+                    type="checkbox"
+                    checked={paginatedRecords.length > 0 && paginatedRecords.every(item => selectedIds.has(item.id))}
+                    onChange={handleSelectAll}
+                    className="rounded mr-3"
+                  />
+                  <span className="text-sm text-gray-500">Select all on this page</span>
+                </div>
+              )}
               {paginatedRecords.map((record) => (
                 <div
                   key={record.id}
-                  className="bg-gradient-to-r from-white to-gray-50 border border-red-200 rounded-xl p-6 hover:shadow-md transition-shadow"
+                  className="bg-gradient-to-r from-white to-gray-50 border border-red-200 rounded-xl p-6 hover:shadow-md transition-shadow flex gap-4"
                 >
+                  <div className="flex items-start pt-1">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(record.id)}
+                      onChange={() => handleSelectItem(record.id)}
+                      className="rounded"
+                    />
+                  </div>
+                  <div className="flex-1">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center space-x-4">
                       <div className="h-10 w-10 bg-gradient-to-r from-red-500 to-pink-500 rounded-lg flex items-center justify-center">
@@ -855,6 +933,7 @@ const PayableDetails = () => {
                       </p>
                     </div>
                   )}
+                  </div>
                 </div>
               ))}
             </div>

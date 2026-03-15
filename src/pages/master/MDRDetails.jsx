@@ -7,10 +7,10 @@ import { DataTable } from "../../components/common/DataTable";
 import SearchableDropdown from "../../components/common/SearchableDropdown"; // Import SearchableDropdown
 import { mdrService, accountService } from "../../services/realServices";
 import { useApiService } from "../../hooks/useApiService";
-import { Building, MapPin, Calendar, AlertCircle, CheckCircle, Plus, Save, RefreshCw, Eye, FileText, Search, DollarSign, Hash, Clock } from 'lucide-react';
+import { Building, MapPin, Calendar, AlertCircle, CheckCircle, Plus, Save, RefreshCw, Eye, FileText, DollarSign, Hash, Clock, Trash2, Edit3 } from 'lucide-react';
 import { ErrorDisplay } from '../../components/common/ErrorDisplay';
 import { ConfirmDialog, useConfirmDialog } from "../../components/common/Popup";
-import Pagination from '../../components/common/Pagination';
+import SearchableRecords from '../../components/common/SearchableRecords';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -45,8 +45,9 @@ const MDRDetails = () => {
   const [savedRecords, setSavedRecords] = useState([]);
   const [showRecords, setShowRecords] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchFilters, setSearchFilters] = useState({ searchTerm: '', financialYear: '' });
   const [errors, setErrors] = useState({});
+  const [selectedIds, setSelectedIds] = useState(new Set());
 
   const { executeApi, loading, error, clearError } = useApiService();
 
@@ -418,17 +419,6 @@ const handleDelete = async (id) => {
   //   }
   // };
 
-  const handleSearch = async () => {
-    if (searchTerm.trim()) {
-      const result = await executeApi(mdrService.search, searchTerm);
-      if (result.success) {
-        setSavedRecords(result.data || []);
-      }
-    } else {
-      await loadSavedRecords();
-    }
-  };
-
   const showToast = (message, type) => {
     const toast = document.createElement('div');
     toast.className = `fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 ${
@@ -442,20 +432,57 @@ const handleDelete = async (id) => {
     }, 3000);
   };
 
-  // Filter records locally
-  const filteredRecords = savedRecords.filter(record =>
-    record.leaseNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    record.assessmentNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    record.lesseeName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    record.ledgerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    record.leasePropertyDetails?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredRecords = savedRecords.filter(record => {
+    const { searchTerm, financialYear } = searchFilters;
+    const matchesSearch = !searchTerm ||
+      record.leaseNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      record.assessmentNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      record.lesseeName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      record.ledgerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      record.leasePropertyDetails?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesYear = !financialYear || record.financialYear === financialYear;
+    return matchesSearch && matchesYear;
+  });
 
   const totalPages = Math.ceil(filteredRecords.length / ITEMS_PER_PAGE);
   const paginatedRecords = filteredRecords.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   );
+
+  const handleSelectAll = () => {
+    if (paginatedRecords.every(item => selectedIds.has(item.id))) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(paginatedRecords.map(item => item.id)));
+    }
+  };
+
+  const handleSelectItem = (id) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) { next.delete(id); } else { next.add(id); }
+    setSelectedIds(next);
+  };
+
+  const handleBulkDelete = async () => {
+    const confirmed = await showConfirmDialog({
+      title: 'Delete Selected',
+      message: `Are you sure you want to delete ${selectedIds.size} selected record(s)? This action cannot be undone.`,
+      confirmText: 'Delete All',
+      cancelText: 'Cancel',
+      type: 'error'
+    });
+    if (confirmed) {
+      let count = 0;
+      for (const id of selectedIds) {
+        const result = await executeApi(mdrService.delete, id);
+        if (result.success) count++;
+      }
+      setSelectedIds(new Set());
+      await loadSavedRecords();
+      showToast(`${count} record(s) deleted successfully!`, 'success');
+    }
+  };
 
   const columns = [
     { key: 'leaseNo', title: 'Lease No', sortable: true },
@@ -534,67 +561,141 @@ const handleDelete = async (id) => {
 
       {/* Records List */}
       {showRecords && (
-        <div className="bg-white/60 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200/60 overflow-hidden">
-          <div className="bg-gradient-to-r from-purple-500 to-pink-500 px-6 py-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-white">MDR Records ({savedRecords.length})</h2>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search records..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                  className="pl-10 pr-4 py-2 bg-white/20 backdrop-blur-sm border border-white/30 rounded-lg text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/50"
-                />
+        <SearchableRecords
+          title="MDR Records"
+          totalRecords={filteredRecords.length}
+          searchFilters={searchFilters}
+          onFiltersChange={(f) => { setSearchFilters(f); setCurrentPage(1); }}
+          loading={loading}
+          gradientFrom="from-purple-500"
+          gradientTo="to-pink-500"
+          searchPlaceholder="Search by lease no, assessment no, lessee name..."
+          filterConfig={{ dateRange: false, amountRange: false, fromWhom: false, fundType: false, status: false, transactionMode: false }}
+          customFilters={[
+            {
+              key: 'financialYear',
+              label: 'Financial Year',
+              type: 'select',
+              icon: Calendar,
+              options: [
+                { value: '', label: 'All Years' },
+                { value: '2022-23', label: '2022-23' },
+                { value: '2023-24', label: '2023-24' },
+                { value: '2024-25', label: '2024-25' },
+                { value: '2025-26', label: '2025-26' },
+              ]
+            }
+          ]}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          pageSize={ITEMS_PER_PAGE}
+        >
+          {selectedIds.size > 0 && (
+            <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-4">
+              <span className="text-sm font-medium text-red-700">
+                {selectedIds.size} record(s) selected
+              </span>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setSelectedIds(new Set())}
+                  className="text-sm text-gray-600 hover:text-gray-900 px-3 py-1.5 border border-gray-300 rounded-lg bg-white"
+                >
+                  Clear
+                </button>
+                <button
+                  onClick={handleBulkDelete}
+                  className="flex items-center space-x-2 bg-red-600 hover:bg-red-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Delete Selected ({selectedIds.size})</span>
+                </button>
               </div>
             </div>
-          </div>
-          
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-              <span className="ml-2 text-slate-600">Loading records...</span>
+          )}
+          {filteredRecords.length === 0 ? (
+            <div className="text-center py-8">
+              <Building className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+              <p className="text-slate-500">
+                {searchFilters.searchTerm || searchFilters.financialYear ? 'No records found matching your search.' : 'No MDR records found.'}
+              </p>
+              {!searchFilters.searchTerm && !searchFilters.financialYear && (
+                <button
+                  onClick={() => setShowRecords(false)}
+                  className="text-purple-600 hover:text-purple-800 text-sm font-medium mt-2"
+                >
+                  Create your first MDR record →
+                </button>
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
-              {filteredRecords.length === 0 ? (
-                <div className="text-center py-8">
-                  <Building className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-                  <p className="text-slate-500">
-                    {searchTerm ? 'No records found matching your search.' : 'No MDR records found.'}
-                  </p>
-                  {!searchTerm && (
-                    <button
-                      onClick={() => setShowRecords(false)}
-                      className="text-purple-600 hover:text-purple-800 text-sm font-medium mt-2"
-                    >
-                      Create your first MDR record →
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <>
-                  <DataTable
-                    columns={columns}
-                    data={paginatedRecords}
-                    onEdit={handleEdit}
-                    onDelete={handleDelete}
-                  />
-                  {totalPages > 1 && (
-                    <Pagination
-                      currentPage={currentPage}
-                      totalPages={totalPages}
-                      onPageChange={setCurrentPage}
-                      pageSize={ITEMS_PER_PAGE}
-                    />
-                  )}
-                </>
-              )}
+              <table className="w-full">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="px-4 py-3 w-10">
+                      <input
+                        type="checkbox"
+                        checked={paginatedRecords.length > 0 && paginatedRecords.every(item => selectedIds.has(item.id))}
+                        onChange={handleSelectAll}
+                        className="rounded"
+                      />
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Lease No</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Assessment No</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Financial Year</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Ledger</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Lessee Name</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Lease Period</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Monthly Rent (₹)</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Yearly Demand (₹)</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Next Renewal</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white/40 divide-y divide-slate-200">
+                  {paginatedRecords.map((record) => (
+                    <tr key={record.id} className="hover:bg-white/60 transition-colors">
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(record.id)}
+                          onChange={() => handleSelectItem(record.id)}
+                          className="rounded"
+                        />
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-900">{record.leaseNo}</td>
+                      <td className="px-4 py-3 text-sm text-slate-900">{record.assessmentNo}</td>
+                      <td className="px-4 py-3 text-sm text-slate-900">{record.financialYear}</td>
+                      <td className="px-4 py-3 text-sm text-slate-900">{record.ledgerCode} - {record.ledgerName}</td>
+                      <td className="px-4 py-3 text-sm text-slate-900">{record.lesseeName}</td>
+                      <td className="px-4 py-3 text-sm text-slate-900">{record.leasePeriod}</td>
+                      <td className="px-4 py-3 text-sm text-slate-900">{record.monthlyInstallment?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                      <td className="px-4 py-3 text-sm text-slate-900">{record.totalDemandPerYear?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                      <td className="px-4 py-3 text-sm text-slate-900">{record.nextRenewalDate}</td>
+                      <td className="px-4 py-3 text-sm font-medium space-x-2">
+                        <button
+                          onClick={() => handleEdit(record)}
+                          className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50"
+                          title="Edit"
+                        >
+                          <Edit3 className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(record.id)}
+                          className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50"
+                          title="Delete"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
-        </div>
+        </SearchableRecords>
       )}
 
       {/* Main Form */}

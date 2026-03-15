@@ -12,11 +12,11 @@ import { ToastContainer } from '../../components/common/ToastContainer';
 import { Header } from '../../components/common/Header';
 import { ErrorDisplay } from '../../components/common/ErrorDisplay';
 import { EmptyState } from '../../components/common/EmptyState';
+import SearchableRecords from '../../components/common/SearchableRecords';
 
 // Import utilities
 import { showConfirmDialog } from '../../utils/confirmDialog';
 import { createVoucherService } from '../../services/createVoucherService';
-import Pagination from '../../components/common/Pagination';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -28,7 +28,8 @@ const JournalVoucherCorrection = () => {
   
   const [currentPage, setCurrentPage] = useState(1);
   const [journalVouchers, setJournalVouchers] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchFilters, setSearchFilters] = useState({ searchTerm: '', natureOfTransaction: '', status: '' });
+  const [selectedIds, setSelectedIds] = useState(new Set());
 
   const journalVoucherService = createVoucherService('/journal-vouchers');
 
@@ -86,21 +87,59 @@ const JournalVoucherCorrection = () => {
     return types[natureOfTransaction] || { label: natureOfTransaction, color: 'bg-gray-100 text-gray-800', description: 'Unknown' };
   };
 
-  const filteredVouchers = journalVouchers.filter(voucher =>
-    voucher.journalNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    voucher.voucherNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    voucher.natureOfTransaction?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    voucher.journalDate?.includes(searchTerm) ||
-    voucher.nameOfTheScheme?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    voucher.nameOfTheWork?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    voucher.narration?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredVouchers = journalVouchers.filter(voucher => {
+    const { searchTerm, natureOfTransaction, status } = searchFilters;
+    const matchesSearch = !searchTerm ||
+      voucher.journalNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      voucher.voucherNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      voucher.natureOfTransaction?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      voucher.journalDate?.includes(searchTerm) ||
+      voucher.nameOfTheScheme?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      voucher.nameOfTheWork?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      voucher.narration?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesNature = !natureOfTransaction || voucher.natureOfTransaction === natureOfTransaction;
+    const matchesStatus = !status || (status === 'balanced' ? voucher.balanced : !voucher.balanced);
+    return matchesSearch && matchesNature && matchesStatus;
+  });
 
   const totalPages = Math.ceil(filteredVouchers.length / ITEMS_PER_PAGE);
   const paginatedVouchers = filteredVouchers.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   );
+
+  const handleSelectAll = () => {
+    if (paginatedVouchers.every(v => selectedIds.has(v.id))) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(paginatedVouchers.map(v => v.id)));
+    }
+  };
+
+  const handleSelectItem = (id) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) { next.delete(id); } else { next.add(id); }
+    setSelectedIds(next);
+  };
+
+  const handleBulkDelete = async () => {
+    const confirmed = await showConfirmDialog(
+      'Delete Selected',
+      `Are you sure you want to delete ${selectedIds.size} selected voucher(s)? This action cannot be undone.`,
+      'Delete All',
+      'Cancel'
+    );
+    if (confirmed) {
+      let count = 0;
+      for (const id of selectedIds) {
+        const result = await executeApi(journalVoucherService.delete, id);
+        if (result.success) count++;
+      }
+      setSelectedIds(new Set());
+      await loadJournalVouchers();
+      showToast(`${count} voucher(s) deleted successfully!`, 'success');
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -125,31 +164,75 @@ const JournalVoucherCorrection = () => {
         countText="text-purple-800"
       />
 
-      {/* Search Bar */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <input
-          type="text"
-          placeholder="Search by Journal No, Nature, Date, Scheme, Work, or Narration..."
-          value={searchTerm}
-          onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-        />
-      </div>
-
-      {/* Vouchers Table */}
-      {filteredVouchers.length === 0 ? (
-        <EmptyState
-          icon={BookOpen}
-          title="No journal vouchers found."
-          actionText="Go to Journal Vouchers"
-          onAction={() => window.location.href = '/journal-voucher'}
-          searchTerm={searchTerm}
-        />
-      ) : (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <SearchableRecords
+        title="Journal Vouchers"
+        totalRecords={filteredVouchers.length}
+        searchFilters={searchFilters}
+        onFiltersChange={(f) => { setSearchFilters(f); setCurrentPage(1); }}
+        loading={loading}
+        gradientFrom="from-purple-500"
+        gradientTo="to-indigo-500"
+        searchPlaceholder="Search by Journal No, Nature, Date, Scheme, Work, or Narration..."
+        filterConfig={{ dateRange: true, amountRange: true, fromWhom: false, fundType: false, status: true, transactionMode: false }}
+        customFilters={[
+          { key: 'natureOfTransaction', label: 'Journal Type', type: 'select', options: [
+            { value: 'EJV', label: 'EJV - Expenditure' },
+            { value: 'PJV', label: 'PJV - Purchase' },
+            { value: 'CJV', label: 'CJV - Contra' },
+            { value: 'FAJV', label: 'FAJV - Fixed Asset' },
+            { value: 'GJV', label: 'GJV - General' },
+          ]}
+        ]}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+        pageSize={ITEMS_PER_PAGE}
+      >
+        {/* Vouchers Table */}
+        {selectedIds.size > 0 && (
+          <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-4">
+            <span className="text-sm font-medium text-red-700">
+              {selectedIds.size} voucher(s) selected
+            </span>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setSelectedIds(new Set())}
+                className="text-sm text-gray-600 hover:text-gray-900 px-3 py-1.5 border border-gray-300 rounded-lg bg-white"
+              >
+                Clear
+              </button>
+              <button
+                onClick={handleBulkDelete}
+                disabled={loading}
+                className="flex items-center space-x-2 bg-red-600 hover:bg-red-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium disabled:opacity-50"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span>Delete Selected ({selectedIds.size})</span>
+              </button>
+            </div>
+          </div>
+        )}
+        {filteredVouchers.length === 0 ? (
+          <EmptyState
+            icon={BookOpen}
+            title="No journal vouchers found."
+            actionText="Go to Journal Vouchers"
+            onAction={() => window.location.href = '/journal-voucher'}
+            searchTerm={searchFilters.searchTerm}
+          />
+        ) : (
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gradient-to-r from-purple-500 to-indigo-500 text-white">
               <tr>
+                <th className="px-4 py-4 w-10">
+                  <input
+                    type="checkbox"
+                    checked={paginatedVouchers.length > 0 && paginatedVouchers.every(v => selectedIds.has(v.id))}
+                    onChange={handleSelectAll}
+                    className="rounded"
+                  />
+                </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold">Journal Details</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold">Project Information</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold">Financial Summary</th>
@@ -164,6 +247,14 @@ const JournalVoucherCorrection = () => {
                 
                 return (
                   <tr key={voucher.id} className={`hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-25'}`}>
+                    <td className="px-4 py-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(voucher.id)}
+                        onChange={() => handleSelectItem(voucher.id)}
+                        className="rounded"
+                      />
+                    </td>
                     <td className="px-6 py-4">
                       <div className="space-y-2">
                         <div className="font-semibold text-gray-900">
@@ -297,22 +388,9 @@ const JournalVoucherCorrection = () => {
               })}
             </tbody>
           </table>
-        </div>
-      )}
-      
-      {filteredVouchers.length > 0 && (
-        <div className="text-center text-sm text-gray-500">
-          Showing {paginatedVouchers.length} of {filteredVouchers.length} vouchers
-        </div>
-      )}
-      {totalPages > 1 && (
-        <Pagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPageChange={setCurrentPage}
-          pageSize={ITEMS_PER_PAGE}
-        />
-      )}
+          </div>
+        )}
+      </SearchableRecords>
     </div>
   );
 };

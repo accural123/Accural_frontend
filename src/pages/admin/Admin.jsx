@@ -5,6 +5,7 @@ import { authService } from '../../services/authService';
 import { useToast } from '../../hooks/useToast';
 import { ToastContainer } from '../../components/common/ToastContainer';
 import { KeyRound, Shield, UserX, UserCheck, Trash2, Edit, RefreshCw } from 'lucide-react';
+import SearchableRecords from '../../components/common/SearchableRecords';
 const Admin = () => {
   const { dialogState, showConfirmDialog, closeDialog } = useConfirmDialog();
   const { toasts, showToast, removeToast } = useToast();
@@ -16,6 +17,11 @@ const Admin = () => {
   const [newPassword, setNewPassword] = useState('');
   const [editingUser, setEditingUser] = useState(null);
   const [selectedUsers, setSelectedUsers] = useState([]);
+  const [searchFilters, setSearchFilters] = useState({
+    searchTerm: '',
+    role: '',
+    userStatus: '',
+  });
   const [formData, setFormData] = useState({
     name: '',
     username: '',
@@ -253,14 +259,37 @@ const Admin = () => {
       showToast('Please select users first', 'warning');
       return;
     }
-    
-    setUsers(users.map(user => 
-      selectedUsers.includes(user.id) 
+
+    setUsers(users.map(user =>
+      selectedUsers.includes(user.id)
         ? { ...user, status: 'Inactive', lastStatusChange: new Date().toLocaleString() }
         : user
     ));
-    
+
     setSelectedUsers([]);
+  };
+
+  const handleBulkDeleteUsers = async () => {
+    if (selectedUsers.length === 0) return;
+    const confirmed = await showConfirmDialog({
+      title: 'Delete Selected Users',
+      message: `Are you sure you want to delete ${selectedUsers.length} selected user(s)? This action cannot be undone.`,
+      confirmText: 'Delete All',
+      cancelText: 'Cancel',
+      type: 'error'
+    });
+    if (confirmed) {
+      let count = 0;
+      for (const userId of selectedUsers) {
+        try {
+          const response = await authService.deleteUser(userId);
+          if (response.success) count++;
+        } catch {}
+      }
+      setSelectedUsers([]);
+      fetchUsers();
+      showToast(`${count} user(s) deleted successfully!`, 'success');
+    }
   };
 
   const handleSelectUser = (userId) => {
@@ -278,6 +307,17 @@ const Admin = () => {
       setSelectedUsers(users.map(user => user.id));
     }
   };
+
+  const filteredUsers = users.filter(user => {
+    const f = searchFilters;
+    const searchMatch = !f.searchTerm ||
+      user.name?.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
+      user.username?.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
+      user.email?.toLowerCase().includes(f.searchTerm.toLowerCase());
+    const roleMatch = !f.role || user.role === f.role;
+    const statusMatch = !f.userStatus || user.status === f.userStatus;
+    return searchMatch && roleMatch && statusMatch;
+  });
 
   if (loading) {
     return (
@@ -301,36 +341,76 @@ const Admin = () => {
       </div>
 
       {/* User Management Content */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <div className="space-y-6">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-semibold">User Management</h3>
-            <div className="flex space-x-2">
-              {selectedUsers.length > 0 && (
-                <div className="flex space-x-2">
-                  <button 
-                    onClick={handleBulkActivate}
-                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md text-sm"
-                  >
-                    Activate Selected ({selectedUsers.length})
-                  </button>
-                  <button 
-                    onClick={handleBulkDeactivate}
-                    className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-md text-sm"
-                  >
-                    Deactivate Selected ({selectedUsers.length})
-                  </button>
-                </div>
-              )}
-              <button 
-                onClick={() => openUserModal()}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm"
-              >
-                + Add New User
-              </button>
-            </div>
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <div className="flex space-x-2">
+            {selectedUsers.length > 0 && (
+              <>
+                <button
+                  onClick={handleBulkActivate}
+                  className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md text-sm"
+                >
+                  Activate Selected ({selectedUsers.length})
+                </button>
+                <button
+                  onClick={handleBulkDeactivate}
+                  className="bg-orange-600 hover:bg-orange-700 text-white px-3 py-2 rounded-md text-sm"
+                >
+                  Deactivate Selected ({selectedUsers.length})
+                </button>
+                <button
+                  onClick={handleBulkDeleteUsers}
+                  className="flex items-center space-x-1 bg-red-700 hover:bg-red-800 text-white px-3 py-2 rounded-md text-sm"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>Delete Selected ({selectedUsers.length})</span>
+                </button>
+              </>
+            )}
           </div>
-          
+          <button
+            onClick={() => openUserModal()}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm"
+          >
+            + Add New User
+          </button>
+        </div>
+
+        <SearchableRecords
+          title="System Users"
+          totalRecords={filteredUsers.length}
+          searchFilters={searchFilters}
+          onFiltersChange={setSearchFilters}
+          loading={false}
+          gradientFrom="from-blue-600"
+          gradientTo="to-indigo-600"
+          searchPlaceholder="Search by name, username, or email..."
+          filterConfig={{ dateRange: false, amountRange: false, fromWhom: false, fundType: false, status: false, transactionMode: false }}
+          customFilters={[
+            {
+              key: 'role',
+              label: 'Role',
+              type: 'select',
+              options: [
+                { value: '', label: 'All Roles' },
+                { value: 'Administrator', label: 'Administrator' },
+                { value: 'Accountant', label: 'Accountant' },
+                { value: 'Data Entry Clerk', label: 'Data Entry Clerk' },
+                { value: 'Read Only', label: 'Read Only' },
+              ],
+            },
+            {
+              key: 'userStatus',
+              label: 'Status',
+              type: 'select',
+              options: [
+                { value: '', label: 'All Status' },
+                { value: 'Active', label: 'Active' },
+                { value: 'Inactive', label: 'Inactive' },
+              ],
+            },
+          ]}
+        >
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
@@ -338,7 +418,7 @@ const Admin = () => {
                   <th className="px-6 py-3 text-left">
                     <input
                       type="checkbox"
-                      checked={selectedUsers.length === users.length && users.length > 0}
+                      checked={selectedUsers.length === filteredUsers.length && filteredUsers.length > 0}
                       onChange={handleSelectAllUsers}
                       className="rounded"
                     />
@@ -350,7 +430,7 @@ const Admin = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {users.map((user) => (
+                {filteredUsers.map((user) => (
                   <tr key={user.id} className={selectedUsers.includes(user.id) ? 'bg-blue-50' : ''}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <input
@@ -381,8 +461,8 @@ const Admin = () => {
                       <button
                         onClick={() => handleToggleUserStatus(user.id)}
                         className={`px-3 py-1 text-xs font-medium rounded-full cursor-pointer transition-all duration-200 ${
-                          user.status === 'Active' 
-                            ? 'bg-green-100 text-green-800 hover:bg-green-200 border border-green-300' 
+                          user.status === 'Active'
+                            ? 'bg-green-100 text-green-800 hover:bg-green-200 border border-green-300'
                             : 'bg-red-100 text-red-800 hover:bg-red-200 border border-red-300'
                         }`}
                         title={`Click to ${user.status === 'Active' ? 'deactivate' : 'activate'} user`}
@@ -396,21 +476,21 @@ const Admin = () => {
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                      <button 
+                      <button
                         onClick={() => openUserModal(user)}
                         className="text-blue-600 hover:text-blue-900"
                         title="Edit User"
                       >
                         <Edit className="h-4 w-4" />
                       </button>
-                      <button 
+                      <button
                         onClick={() => handleDeleteUser(user.id)}
                         className="text-red-600 hover:text-red-900"
                         title="Delete User"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
-                      <button 
+                      <button
                         onClick={() => openResetModal(user)}
                         className="text-amber-600 hover:text-amber-900"
                         title="Reset Password"
@@ -422,8 +502,11 @@ const Admin = () => {
                 ))}
               </tbody>
             </table>
+            {filteredUsers.length === 0 && (
+              <div className="text-center py-8 text-gray-500">No users found matching your filters.</div>
+            )}
           </div>
-        </div>
+        </SearchableRecords>
       </div>
 <ConfirmDialog
   isOpen={dialogState.isOpen}

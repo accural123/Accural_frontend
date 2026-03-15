@@ -617,6 +617,7 @@ const LedgerCreation = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showBankDetails, setShowBankDetails] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
 
   const { executeApi, loading, error, clearError } = useApiService();
 
@@ -957,6 +958,40 @@ const handleDelete = async (id) => {
     ledger.bankName?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const handleSelectAll = () => {
+    if (filteredLedgers.every(l => selectedIds.has(l.id))) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredLedgers.map(l => l.id)));
+    }
+  };
+
+  const handleSelectItem = (id) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) { next.delete(id); } else { next.add(id); }
+    setSelectedIds(next);
+  };
+
+  const handleBulkDelete = async () => {
+    const confirmed = await showConfirmDialog({
+      title: 'Delete Selected',
+      message: `Are you sure you want to delete ${selectedIds.size} selected ledger(s)? This action cannot be undone.`,
+      confirmText: 'Delete All',
+      cancelText: 'Cancel',
+      type: 'error'
+    });
+    if (confirmed) {
+      let count = 0;
+      for (const id of selectedIds) {
+        const result = await executeApi(ledgerService.delete, id);
+        if (result.success) count++;
+      }
+      setSelectedIds(new Set());
+      await loadLedgers();
+      showToast(`${count} ledger(s) deleted successfully!`, 'success');
+    }
+  };
+
   // Get local body type label for display
   // const getLocalBodyTypeLabel = (value) => {
   //   const found = localBodyTypeOptions.find(type => type.value === value);
@@ -1221,10 +1256,41 @@ const handleDelete = async (id) => {
             </div>
           </div>
           
+          {selectedIds.size > 0 && (
+            <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded-lg px-4 py-3 mx-4 mt-4">
+              <span className="text-sm font-medium text-red-700">
+                {selectedIds.size} ledger(s) selected
+              </span>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setSelectedIds(new Set())}
+                  className="text-sm text-gray-600 hover:text-gray-900 px-3 py-1.5 border border-gray-300 rounded-lg bg-white"
+                >
+                  Clear
+                </button>
+                <button
+                  onClick={handleBulkDelete}
+                  className="flex items-center space-x-2 bg-red-600 hover:bg-red-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Delete Selected ({selectedIds.size})</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-slate-50">
                 <tr>
+                  <th className="px-4 py-3 w-10">
+                    <input
+                      type="checkbox"
+                      checked={filteredLedgers.length > 0 && filteredLedgers.every(l => selectedIds.has(l.id))}
+                      onChange={handleSelectAll}
+                      className="rounded"
+                    />
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Ledger Code</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Ledger Head</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Group</th>
@@ -1236,7 +1302,15 @@ const handleDelete = async (id) => {
               </thead>
               <tbody className="bg-white/40 divide-y divide-slate-200">
                 {filteredLedgers.map((ledger) => (
-                  <tr key={ledger.id} className="hover:bg-white/60 transition-colors">
+                  <tr key={ledger.id} className={`hover:bg-white/60 transition-colors ${selectedIds.has(ledger.id) ? 'bg-blue-50' : ''}`}>
+                    <td className="px-4 py-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(ledger.id)}
+                        onChange={() => handleSelectItem(ledger.id)}
+                        className="rounded"
+                      />
+                    </td>
                     <td className="px-6 py-4">
                       <div className="text-sm font-medium text-slate-900">{ledger.ledgerCode}</div>
                     </td>

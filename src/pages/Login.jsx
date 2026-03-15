@@ -579,20 +579,20 @@ const Login = () => {
     // Navigation is handled automatically by AuthContext
   };
 
-  const demoLogins = [
-    { username: 'admin', password: 'admin123', role: 'Administrator', color: 'bg-purple-500' },
-    { username: 'clerk', password: 'clerk123', role: 'Data Entry Clerk', color: 'bg-blue-500' },
-    { username: 'accountant', password: 'acc123', role: 'Accountant', color: 'bg-green-500' }
-  ];
+  // const demoLogins = [
+  //   { username: 'admin', password: 'admin123', role: 'Administrator', color: 'bg-purple-500' },
+  //   { username: 'clerk', password: 'clerk123', role: 'Data Entry Clerk', color: 'bg-blue-500' },
+  //   { username: 'accountant', password: 'acc123', role: 'Accountant', color: 'bg-green-500' }
+  // ];
 
-  const quickLogin = (demo) => {
-    setCredentials({ username: demo.username, password: demo.password });
-    // Clear any existing errors
-    setLocalErrors({});
-    if (error) {
-      clearError();
-    }
-  };
+  // const quickLogin = (demo) => {
+  //   setCredentials({ username: demo.username, password: demo.password });
+  //   // Clear any existing errors
+  //   setLocalErrors({});
+  //   if (error) {
+  //     clearError();
+  //   }
+  // };
 
   const handleKeyPress = (e) => {
     if (e.key === 'Enter') {
@@ -748,7 +748,7 @@ const Login = () => {
           </div>
 
           {/* Demo Credentials */}
-          <div className="mt-8 pt-6 border-t border-white/10">
+          {/* <div className="mt-8 pt-6 border-t border-white/10">
             <p className="text-gray-300 text-sm mb-4 text-center">Quick Access</p>
             <div className="grid gap-3">
               {demoLogins.map((demo, index) => (
@@ -771,12 +771,12 @@ const Login = () => {
                 </button>
               ))}
             </div>
-          </div>
+          </div> */}
         </div>
 
         {/* Footer */}
         <div className="text-center text-gray-400 text-sm space-y-1">
-          <p>© 2025 Accrual Accounting System</p>
+          <p>© 2026 Accrual Accounting System</p>
           <p className="flex items-center justify-center space-x-4">
             <span className="flex items-center space-x-1">
               <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

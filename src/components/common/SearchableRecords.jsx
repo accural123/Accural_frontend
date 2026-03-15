@@ -18,7 +18,17 @@ export const SearchableRecords = ({
   totalPages,
   onPageChange,
   pageSize = 20,
+  filterConfig = {},
+  searchPlaceholder = 'Search records...',
 }) => {
+  const {
+    dateRange = true,
+    amountRange = true,
+    fromWhom = true,
+    fundType = true,
+    status = true,
+    transactionMode = true,
+  } = filterConfig;
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
   const [localFilters, setLocalFilters] = useState({
     searchTerm: '',
@@ -110,7 +120,7 @@ export const SearchableRecords = ({
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/70" />
             <input
               type="text"
-              placeholder="Search by voucher number, from whom, fund type..."
+              placeholder={searchPlaceholder}
               value={localFilters.searchTerm}
               onChange={(e) => handleFilterChange('searchTerm', e.target.value)}
               className="w-full pl-10 pr-4 py-3 bg-white/20 backdrop-blur-sm border border-white/30 rounded-lg text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50"
@@ -132,122 +142,138 @@ export const SearchableRecords = ({
         <div className="bg-gradient-to-b from-slate-50 to-white border-b border-slate-200 p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {/* Date Range */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700 flex items-center space-x-1">
-                <Calendar className="h-4 w-4" />
-                <span>Date From</span>
-              </label>
-              <input
-                type="date"
-                value={localFilters.dateFrom}
-                onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
+            {dateRange && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700 flex items-center space-x-1">
+                  <Calendar className="h-4 w-4" />
+                  <span>Date From</span>
+                </label>
+                <input
+                  type="date"
+                  value={localFilters.dateFrom}
+                  onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+            )}
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700 flex items-center space-x-1">
-                <Calendar className="h-4 w-4" />
-                <span>Date To</span>
-              </label>
-              <input
-                type="date"
-                value={localFilters.dateTo}
-                onChange={(e) => handleFilterChange('dateTo', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
+            {dateRange && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700 flex items-center space-x-1">
+                  <Calendar className="h-4 w-4" />
+                  <span>Date To</span>
+                </label>
+                <input
+                  type="date"
+                  value={localFilters.dateTo}
+                  onChange={(e) => handleFilterChange('dateTo', e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+            )}
 
             {/* Amount Range */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700 flex items-center space-x-1">
-                <DollarSign className="h-4 w-4" />
-                <span>Min Amount</span>
-              </label>
-              <input
-                type="number"
-                placeholder="₹0"
-                value={localFilters.amountMin}
-                onChange={(e) => handleFilterChange('amountMin', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
+            {amountRange && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700 flex items-center space-x-1">
+                  <DollarSign className="h-4 w-4" />
+                  <span>Min Amount</span>
+                </label>
+                <input
+                  type="number"
+                  placeholder="₹0"
+                  value={localFilters.amountMin}
+                  onChange={(e) => handleFilterChange('amountMin', e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+            )}
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700 flex items-center space-x-1">
-                <DollarSign className="h-4 w-4" />
-                <span>Max Amount</span>
-              </label>
-              <input
-                type="number"
-                placeholder="₹999999"
-                value={localFilters.amountMax}
-                onChange={(e) => handleFilterChange('amountMax', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
+            {amountRange && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700 flex items-center space-x-1">
+                  <DollarSign className="h-4 w-4" />
+                  <span>Max Amount</span>
+                </label>
+                <input
+                  type="number"
+                  placeholder="₹999999"
+                  value={localFilters.amountMax}
+                  onChange={(e) => handleFilterChange('amountMax', e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+            )}
 
             {/* From Whom */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700 flex items-center space-x-1">
-                <User className="h-4 w-4" />
-                <span>From Whom</span>
-              </label>
-              <input
-                type="text"
-                placeholder="Person or entity name"
-                value={localFilters.fromWhom}
-                onChange={(e) => handleFilterChange('fromWhom', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
+            {fromWhom && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700 flex items-center space-x-1">
+                  <User className="h-4 w-4" />
+                  <span>From Whom</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Person or entity name"
+                  value={localFilters.fromWhom}
+                  onChange={(e) => handleFilterChange('fromWhom', e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+            )}
 
             {/* Fund Type */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700 flex items-center space-x-1">
-                <FileText className="h-4 w-4" />
-                <span>Fund Type</span>
-              </label>
-              <input
-                type="text"
-                placeholder="Fund type name"
-                value={localFilters.fundType}
-                onChange={(e) => handleFilterChange('fundType', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
+            {fundType && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700 flex items-center space-x-1">
+                  <FileText className="h-4 w-4" />
+                  <span>Fund Type</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Fund type name"
+                  value={localFilters.fundType}
+                  onChange={(e) => handleFilterChange('fundType', e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+            )}
 
             {/* Status */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700">Status</label>
-              <select
-                value={localFilters.status}
-                onChange={(e) => handleFilterChange('status', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                {statusOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {status && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">Status</label>
+                <select
+                  value={localFilters.status}
+                  onChange={(e) => handleFilterChange('status', e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  {statusOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Transaction Mode */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700">Transaction Mode</label>
-              <select
-                value={localFilters.transactionMode}
-                onChange={(e) => handleFilterChange('transactionMode', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                {transactionModeOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {transactionMode && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">Transaction Mode</label>
+                <select
+                  value={localFilters.transactionMode}
+                  onChange={(e) => handleFilterChange('transactionMode', e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  {transactionModeOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Custom Filters */}
             {customFilters.map((filter, index) => (
@@ -293,7 +319,8 @@ export const SearchableRecords = ({
                       key={key}
                       className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
                     >
-                      <span className="capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}: {value}</span>
+                      <span className="capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
+                      <span className="ml-1">{value}</span>
                       <button
                         onClick={() => handleFilterChange(key, '')}
                         className="ml-2 text-blue-600 hover:text-blue-800"

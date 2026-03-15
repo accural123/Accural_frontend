@@ -3,6 +3,7 @@ import { Wallet, Search, Edit, Trash2, Eye, Plus, Save } from 'lucide-react';
 import { fundService } from "../../services/realServices"; // Change this import when backend is ready
 import { useApiService } from "../../hooks/useApiService";
 import { ConfirmDialog, useConfirmDialog } from "../../components/common/Popup";
+import SearchableRecords from '../../components/common/SearchableRecords';
 const FundCreation = () => {
   const { dialogState, showConfirmDialog, closeDialog } = useConfirmDialog();
   const [formData, setFormData] = useState({
@@ -13,8 +14,9 @@ const FundCreation = () => {
   const [funds, setFunds] = useState([]);
   const [showTable, setShowTable] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchFilters, setSearchFilters] = useState({ searchTerm: '', dateFrom: '', dateTo: '' });
   const [submitLoading, setSubmitLoading] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
   const { executeApi, loading, error, clearError } = useApiService();
 
   // Load funds from localStorage on component mount
@@ -200,9 +202,47 @@ const handleDelete = async (id) => {
   }
 };
   // Filter funds locally
-  const filteredFunds = funds.filter(fund =>
-    fund.fundName?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredFunds = funds.filter(fund => {
+    const f = searchFilters;
+    const searchMatch = !f.searchTerm || fund.fundName?.toLowerCase().includes(f.searchTerm.toLowerCase());
+    const dateFromMatch = !f.dateFrom || fund.createdDate >= f.dateFrom;
+    const dateToMatch = !f.dateTo || fund.createdDate <= f.dateTo;
+    return searchMatch && dateFromMatch && dateToMatch;
+  });
+
+  const handleSelectAll = () => {
+    if (filteredFunds.every(item => selectedIds.has(item.id))) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredFunds.map(item => item.id)));
+    }
+  };
+
+  const handleSelectItem = (id) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) { next.delete(id); } else { next.add(id); }
+    setSelectedIds(next);
+  };
+
+  const handleBulkDelete = async () => {
+    const confirmed = await showConfirmDialog({
+      title: 'Delete Selected',
+      message: `Are you sure you want to delete ${selectedIds.size} selected record(s)? This action cannot be undone.`,
+      confirmText: 'Delete All',
+      cancelText: 'Cancel',
+      type: 'error'
+    });
+    if (confirmed) {
+      let count = 0;
+      for (const id of selectedIds) {
+        const result = await fundService.delete(id);
+        if (result.success) count++;
+      }
+      setSelectedIds(new Set());
+      await loadFunds();
+      showToast(`${count} record(s) deleted successfully!`, 'success');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
@@ -309,75 +349,81 @@ const handleDelete = async (id) => {
         </div>
 
         {/* Funds List */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200/60 overflow-hidden">
-          <div className="bg-gradient-to-r from-green-500 to-emerald-500 px-6 py-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-white">
-                All Funds ({funds.length})
-              </h2>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search funds..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2 bg-white/20 backdrop-blur-sm border border-white/30 rounded-lg text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/50"
-                />
+        <SearchableRecords
+          title="All Funds"
+          totalRecords={filteredFunds.length}
+          searchFilters={searchFilters}
+          onFiltersChange={setSearchFilters}
+          loading={false}
+          gradientFrom="from-green-500"
+          gradientTo="to-emerald-500"
+          searchPlaceholder="Search funds by name..."
+          filterConfig={{ dateRange: true, amountRange: false, fromWhom: false, fundType: false, status: false, transactionMode: false }}
+        >
+          {selectedIds.size > 0 && (
+            <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-4">
+              <span className="text-sm font-medium text-red-700">
+                {selectedIds.size} record(s) selected
+              </span>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setSelectedIds(new Set())}
+                  className="text-sm text-gray-600 hover:text-gray-900 px-3 py-1.5 border border-gray-300 rounded-lg bg-white"
+                >
+                  Clear
+                </button>
+                <button
+                  onClick={handleBulkDelete}
+                  className="flex items-center space-x-2 bg-red-600 hover:bg-red-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Delete Selected ({selectedIds.size})</span>
+                </button>
               </div>
             </div>
-          </div>
-          
+          )}
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-slate-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Fund Name
+                  <th className="px-4 py-3 w-10">
+                    <input
+                      type="checkbox"
+                      checked={filteredFunds.length > 0 && filteredFunds.every(item => selectedIds.has(item.id))}
+                      onChange={handleSelectAll}
+                      className="rounded"
+                    />
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Created Date
-                  </th>
-                  {/* <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Status
-                  </th> */}
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Actions
-                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Fund Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Created Date</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white/40 divide-y divide-slate-200">
                 {filteredFunds.map((fund) => (
                   <tr key={fund.id} className="hover:bg-white/60 transition-colors">
+                    <td className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(fund.id)}
+                        onChange={() => handleSelectItem(fund.id)}
+                        className="rounded"
+                      />
+                    </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center">
                         <Wallet className="h-4 w-4 text-green-600 mr-2" />
-                        <span className="text-sm font-medium text-slate-900">
-                          {fund.fundName}
-                        </span>
+                        <span className="text-sm font-medium text-slate-900">{fund.fundName}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm text-slate-900">{fund.createdDate}</div>
                     </td>
-                    {/* <td className="px-6 py-4">
-                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                        {fund.status || 'Active'}
-                      </span>
-                    </td> */}
                     <td className="px-6 py-4 text-sm font-medium space-x-2">
-                      <button
-                        onClick={() => handleEdit(fund)}
-                        className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50 transition-colors"
-                        title="Edit"
-                      >
+                      <button onClick={() => handleEdit(fund)} className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50 transition-colors" title="Edit">
                         <Edit className="h-4 w-4" />
                       </button>
-                      <button
-                        onClick={() => handleDelete(fund.id)}
-                        className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50 transition-colors"
-                        title="Delete"
-                      >
+                      <button onClick={() => handleDelete(fund.id)} className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50 transition-colors" title="Delete">
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </td>
@@ -385,22 +431,17 @@ const handleDelete = async (id) => {
                 ))}
               </tbody>
             </table>
+            {filteredFunds.length === 0 && (
+              <div className="text-center py-8">
+                <Wallet className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                <p className="text-slate-500">{searchFilters.searchTerm || searchFilters.dateFrom || searchFilters.dateTo ? 'No funds found matching your filters.' : 'No funds created yet.'}</p>
+                {!searchFilters.searchTerm && !searchFilters.dateFrom && !searchFilters.dateTo && (
+                  <p className="text-green-600 text-sm font-medium mt-2">Create your first fund using the form above ↑</p>
+                )}
+              </div>
+            )}
           </div>
-          
-          {filteredFunds.length === 0 && (
-            <div className="text-center py-8">
-              <Wallet className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-              <p className="text-slate-500">
-                {searchTerm ? 'No funds found matching your search.' : 'No funds created yet.'}
-              </p>
-              {!searchTerm && (
-                <p className="text-green-600 text-sm font-medium mt-2">
-                  Create your first fund using the form above ↑
-                </p>
-              )}
-            </div>
-          )}
-        </div>
+        </SearchableRecords>
       </div>
       <ConfirmDialog
   isOpen={dialogState.isOpen}
