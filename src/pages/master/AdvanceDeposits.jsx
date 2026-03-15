@@ -16,9 +16,12 @@ import { CreditCard, Receipt, AlertCircle, CheckCircle, Plus, Save, RefreshCw, E
 import ErrorDisplay from '../../components/common/ErrorDisplay';
 import { VoiceInputField } from '../../components/common/VoiceInputField';
 import MultipleEmployeeEntry from '../../components/common/MultipleEmployeeEntry';
+import Pagination from '../../components/common/Pagination';
+
+const ITEMS_PER_PAGE = 20;
 
 // This is the base component that both AdvanceRegister and DepositRegister will extend
-const AdvanceDeposits = ({ 
+const AdvanceDeposits = ({
   registerType, 
   defaultRegisterType, 
   showLedgerField = true,
@@ -54,6 +57,7 @@ const AdvanceDeposits = ({
     employeeAmount: ''
   });
 
+  const [currentPage, setCurrentPage] = useState(1);
   const [accounts, setAccounts] = useState([]);
   const [savedRecords, setSavedRecords] = useState([]);
   const [showRecords, setShowRecords] = useState(false);
@@ -556,6 +560,12 @@ const AdvanceDeposits = ({
     record.referenceNumber?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const totalPages = Math.ceil(filteredRecords.length / ITEMS_PER_PAGE);
+  const paginatedRecords = filteredRecords.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
   const columns = [
     { key: 'financialYear', title: 'Financial Year', sortable: true },
     ...(showLedgerField ? [
@@ -684,12 +694,22 @@ const AdvanceDeposits = ({
                   )}
                 </div>
               ) : (
-                <DataTable
-                  columns={columns}
-                  data={filteredRecords}
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                />
+                <>
+                  <DataTable
+                    columns={columns}
+                    data={paginatedRecords}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                  />
+                  {totalPages > 1 && (
+                    <Pagination
+                      currentPage={currentPage}
+                      totalPages={totalPages}
+                      onPageChange={setCurrentPage}
+                      pageSize={ITEMS_PER_PAGE}
+                    />
+                  )}
+                </>
               )}
             </div>
           )}

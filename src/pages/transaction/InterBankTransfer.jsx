@@ -29,6 +29,8 @@ import { ResetButton } from '../../components/common/ResetButton';
 import { ConfirmDialog,useConfirmDialog } from '../../components/common/Popup';
 import { VoiceInputField } from '../../components/common/VoiceInputField';
 
+const ITEMS_PER_PAGE = 20;
+
 const InterBankTransfer = () => {
   const { toasts, showToast, removeToast } = useToast();
   const { executeApi, loading, error, clearError } = useApiService();
@@ -78,6 +80,7 @@ const InterBankTransfer = () => {
     resetForm
   } = useVoucherForm(initialFormData, initialDebitEntries, initialCreditEntries);
 
+  const [currentPage, setCurrentPage] = useState(1);
   const [savedTransfers, setSavedTransfers] = useState([]);
   const [showRecords, setShowRecords] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -278,6 +281,7 @@ const InterBankTransfer = () => {
 
   const handleAdvancedFilters = (filters) => {
     setSearchFilters(filters);
+    setCurrentPage(1);
   };
 
   const filteredTransfers = savedTransfers.filter(transfer => {
@@ -308,10 +312,16 @@ const InterBankTransfer = () => {
 
     const ibtTypeMatch = !filters.ibtType || transfer.ibtType === filters.ibtType;
 
-    return searchMatch && dateFromMatch && dateToMatch && amountMinMatch && 
-           amountMaxMatch && fundTypeMatch && statusMatch && 
+    return searchMatch && dateFromMatch && dateToMatch && amountMinMatch &&
+           amountMaxMatch && fundTypeMatch && statusMatch &&
            transactionModeMatch && ibtTypeMatch;
   });
+
+  const totalPages = Math.ceil(filteredTransfers.length / ITEMS_PER_PAGE);
+  const paginatedVouchers = filteredTransfers.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   const resetFormHandler = () => {
     resetForm(initialFormData, initialDebitEntries, initialCreditEntries);
@@ -350,6 +360,10 @@ const InterBankTransfer = () => {
           loading={loading}
           gradientFrom="from-green-500"
           gradientTo="to-blue-500"
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          pageSize={ITEMS_PER_PAGE}
           customFilters={[
             {
               key: 'ibtType',
@@ -374,7 +388,7 @@ const InterBankTransfer = () => {
             />
           ) : (
             <div className="space-y-4">
-              {filteredTransfers.map((transfer) => (
+              {paginatedVouchers.map((transfer) => (
                 <div
                   key={transfer.id}
                   className="bg-gradient-to-r from-white to-gray-50 border border-green-200 rounded-xl p-6 hover:shadow-md transition-shadow"

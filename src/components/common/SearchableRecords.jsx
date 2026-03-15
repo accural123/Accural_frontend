@@ -5,6 +5,7 @@
  */
 import React, { useState } from 'react';
 import { Search, Filter, X, Calendar, DollarSign, User, FileText, ChevronDown, ChevronUp } from 'lucide-react';
+import Pagination from './Pagination';
 
 // export const SearchableRecords = ({ 
 //   title, 
@@ -324,17 +325,21 @@ import { Search, Filter, X, Calendar, DollarSign, User, FileText, ChevronDown, C
 //     </div>
 //   );
 // };
-export const SearchableRecords = ({ 
-  title, 
-  totalRecords, 
+export const SearchableRecords = ({
+  title,
+  totalRecords,
   searchFilters,
   onFiltersChange,
-  loading, 
+  loading,
   children,
   gradientFrom = 'from-purple-500',
   gradientTo = 'to-pink-500',
   showAdvancedSearch = true,
-  customFilters = []
+  customFilters = [],
+  currentPage,
+  totalPages,
+  onPageChange,
+  pageSize = 20,
 }) => {
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
   const [localFilters, setLocalFilters] = useState({
@@ -633,6 +638,15 @@ export const SearchableRecords = ({
       ) : (
         <div className="p-6">
           {children}
+          {totalPages > 1 && onPageChange && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={onPageChange}
+              totalRecords={totalRecords}
+              pageSize={pageSize}
+            />
+          )}
         </div>
       )}
     </div>

@@ -10,6 +10,9 @@ import { useApiService } from "../../hooks/useApiService";
 import { Building, MapPin, Calendar, AlertCircle, CheckCircle, Plus, Save, RefreshCw, Eye, FileText, Search, DollarSign, Hash, Clock } from 'lucide-react';
 import { ErrorDisplay } from '../../components/common/ErrorDisplay';
 import { ConfirmDialog, useConfirmDialog } from "../../components/common/Popup";
+import Pagination from '../../components/common/Pagination';
+
+const ITEMS_PER_PAGE = 20;
 
 const MDRDetails = () => {
   const { dialogState, showConfirmDialog, closeDialog } = useConfirmDialog();
@@ -38,6 +41,7 @@ const MDRDetails = () => {
   });
 
   const [accounts, setAccounts] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
   const [savedRecords, setSavedRecords] = useState([]);
   const [showRecords, setShowRecords] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -447,6 +451,12 @@ const handleDelete = async (id) => {
     record.leasePropertyDetails?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const totalPages = Math.ceil(filteredRecords.length / ITEMS_PER_PAGE);
+  const paginatedRecords = filteredRecords.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
   const columns = [
     { key: 'leaseNo', title: 'Lease No', sortable: true },
     { key: 'assessmentNo', title: 'Assessment No', sortable: true },
@@ -565,12 +575,22 @@ const handleDelete = async (id) => {
                   )}
                 </div>
               ) : (
-                <DataTable
-                  columns={columns}
-                  data={filteredRecords}
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                />
+                <>
+                  <DataTable
+                    columns={columns}
+                    data={paginatedRecords}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                  />
+                  {totalPages > 1 && (
+                    <Pagination
+                      currentPage={currentPage}
+                      totalPages={totalPages}
+                      onPageChange={setCurrentPage}
+                      pageSize={ITEMS_PER_PAGE}
+                    />
+                  )}
+                </>
               )}
             </div>
           )}

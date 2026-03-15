@@ -30,6 +30,8 @@ import { validateVoucherForm } from "../../utils/validation";
 import { showConfirmDialog } from "../../utils/confirmDialog";
 import { createVoucherService } from "../../services/createVoucherService";
 
+const ITEMS_PER_PAGE = 20;
+
 const Reconciliation = () => {
   const { toasts, showToast, removeToast } = useToast();
   const { executeApi, loading, error, clearError } = useApiService();
@@ -43,6 +45,7 @@ const Reconciliation = () => {
     debitCreditDetails: 'Credit'
   });
 
+  const [currentPage, setCurrentPage] = useState(1);
   const [reconciliationEntries, setReconciliationEntries] = useState([]);
   const [savedReconciliations, setSavedReconciliations] = useState([]);
   const [showRecords, setShowRecords] = useState(false);
@@ -242,6 +245,12 @@ const Reconciliation = () => {
     reconciliation.debitCreditDetails?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const totalPages = Math.ceil(filteredReconciliations.length / ITEMS_PER_PAGE);
+  const paginatedReconciliations = filteredReconciliations.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
   const resetFormHandler = () => {
     resetForm();
     setShowRecords(false);
@@ -283,6 +292,10 @@ const Reconciliation = () => {
           loading={loading}
           gradientFrom="from-orange-500"
           gradientTo="to-red-500"
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          pageSize={ITEMS_PER_PAGE}
         >
           {filteredReconciliations.length === 0 ? (
             <EmptyState
@@ -294,7 +307,7 @@ const Reconciliation = () => {
             />
           ) : (
             <div className="space-y-4">
-              {filteredReconciliations.map((reconciliation) => (
+              {paginatedReconciliations.map((reconciliation) => (
                 <ModernVoucherRow
                   key={reconciliation.id}
                   voucher={reconciliation}

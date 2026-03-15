@@ -40,6 +40,8 @@ const EMPLOYEE_LEDGERS = [
 ];
 
 
+const ITEMS_PER_PAGE = 20;
+
 const JournalVoucher = () => {
 const getFilteredLedgerOptions = (entryType) => {
   return allLedgers.map(ledger => {
@@ -143,6 +145,7 @@ const getFilteredLedgerOptions = (entryType) => {
     monthYear: '',
     employeeAmount: ''
   });
+  const [currentPage, setCurrentPage] = useState(1);
   const [searchFilters, setSearchFilters] = useState({
     searchTerm: '',
     dateFrom: '',
@@ -332,9 +335,9 @@ const isLedgerUsedInOppositeEntry = (ledgerCode, entryType) => {
     description: `Created: ${fund.createdDate}`
   }));
 
-  const handleEmployeeEntriesChange = (entries) => {
+  const handleEmployeeEntriesChange = useCallback((entries) => {
     setEmployeeEntries(entries);
-  };
+  }, []);
 
 const mockShowConfirmDialog = async (title, message, confirmText, cancelText) => {
   return await showConfirmDialog({
@@ -621,23 +624,21 @@ const handleSubmit = async () => {
     return;
   }
 
-  // STRICT VALIDATION: Employee entries total MUST match debit or credit entries
+  // SOFT VALIDATION: Warn if employee total doesn't match any debit or credit entry
   if (showMultipleEmployees && employeeEntries.length > 0) {
     const employeeTotal = employeeEntries.reduce((sum, entry) => sum + entry.employeeAmount, 0);
-    
-    // Check if employee total matches any debit or credit entry
-    const hasMatchingDebitEntry = debitEntries.some(entry => Math.abs(entry.amount - employeeTotal) < 0.01);
-    const hasMatchingCreditEntry = creditEntries.some(entry => Math.abs(entry.amount - employeeTotal) < 0.01);
-    
+    const hasMatchingDebitEntry = debitEntries.some(entry => Math.abs(parseFloat(entry.amount) - employeeTotal) < 0.01);
+    const hasMatchingCreditEntry = creditEntries.some(entry => Math.abs(parseFloat(entry.amount) - employeeTotal) < 0.01);
+
     if (!hasMatchingDebitEntry && !hasMatchingCreditEntry) {
-      await showConfirmDialog({
-        title: 'Employee Total Mismatch - Cannot Save',
-        message: `Employee entries total (₹${employeeTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}) must match at least one debit or credit entry amount. Please add a corresponding entry or adjust the employee amounts.`,
-        type: 'error',
-        cancelText: 'OK',
-        hideConfirm: true
+      const proceed = await showConfirmDialog({
+        title: 'Employee Total Mismatch',
+        message: `Employee entries total (₹${employeeTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}) doesn't match any single debit or credit entry amount. Save anyway?`,
+        type: 'warning',
+        confirmText: 'Save Anyway',
+        cancelText: 'Cancel'
       });
-      return; // STOP - Don't allow saving
+      if (!proceed) return;
     }
   }
 
@@ -685,15 +686,12 @@ const handleSubmit = async () => {
       setSpecialFormData({});
     }
     
+    const resolvedJournalType = voucher.journalType || voucher.natureOfTransaction || '';
     const hasWorkDetails = voucher.nameOfContractor || voucher.nameOfSupplier || voucher.valueOfWorkDone || voucher.workAmount;
     const hasMultipleEmployees = voucher.employeeEntries && Array.isArray(voucher.employeeEntries) && voucher.employeeEntries.length > 0;
     const hasSingleEmployee = voucher.nameOfEmployee && voucher.nameOfEmployee.trim() !== '';
-    
-    console.log('Has work details:', hasWorkDetails);
-    console.log('Has multiple employees:', hasMultipleEmployees);
-    console.log('Has single employee:', hasSingleEmployee);
-    
-    if (voucher.journalType === 'EJV') {
+
+    if (resolvedJournalType === 'EJV') {
       setShowEmployeeDetails(hasSingleEmployee || hasMultipleEmployees);
       if (hasMultipleEmployees) {
         setEmployeeEntries(voucher.employeeEntries);
@@ -707,31 +705,30 @@ const handleSubmit = async () => {
       setEmployeeEntries([]);
       setShowMultipleEmployees(false);
     }
-    
-    if (voucher.journalType === 'CJV' || voucher.journalType === 'PJV') {
+
+    if (resolvedJournalType === 'CJV' || resolvedJournalType === 'PJV') {
       setShowWorkDetails(hasWorkDetails);
     } else {
       setShowWorkDetails(false);
     }
-    
     setFormData({
-      journalType: voucher.journalType || '',
+      journalType: resolvedJournalType,
       journalNo: voucher.journalNo || '',
       journalDate: voucher.journalDate || '',
       nameOfScheme: voucher.nameOfScheme || '',
       nameOfWork: voucher.nameOfWork || '',
-      estimateValue: voucher.estimateValue ? voucher.estimateValue.toLocaleString('en-IN') : '',
-      description : voucher.description  || '',
+      estimateValue: voucher.estimateValue ? parseFloat(voucher.estimateValue).toLocaleString('en-IN') : '',
+      description: voucher.description || voucher.narration || '',
       fundType: voucher.fundType || '',
       nameOfContractor: voucher.nameOfContractor || '',
       nameOfSupplier: voucher.nameOfSupplier || '',
-      valueOfWorkDone: voucher.valueOfWorkDone ? voucher.valueOfWorkDone.toLocaleString('en-IN') : '',
-      workAmount: voucher.workAmount ? voucher.workAmount.toLocaleString('en-IN') : '',
+      valueOfWorkDone: voucher.valueOfWorkDone ? parseFloat(voucher.valueOfWorkDone).toLocaleString('en-IN') : '',
+      workAmount: voucher.workAmount ? parseFloat(voucher.workAmount).toLocaleString('en-IN') : '',
       nameOfEmployee: hasMultipleEmployees ? '' : (voucher.nameOfEmployee || ''),
       designation: hasMultipleEmployees ? '' : (voucher.designation || ''),
       section: hasMultipleEmployees ? '' : (voucher.section || ''),
       monthYear: hasMultipleEmployees ? '' : (voucher.monthYear || ''),
-      employeeAmount: hasMultipleEmployees ? '' : (voucher.employeeAmount ? voucher.employeeAmount.toLocaleString('en-IN') : '')
+      employeeAmount: hasMultipleEmployees ? '' : (voucher.employeeAmount ? parseFloat(voucher.employeeAmount).toLocaleString('en-IN') : '')
     });
     
     setDebitEntries(voucher.debitEntries?.map(entry => ({ ...entry, amount: entry.amount?.toString() || '' })) || initialDebitEntries);
@@ -775,6 +772,7 @@ const handleDeleteVoucher = async (voucher) => {
 
   const handleAdvancedFilters = useCallback((filters) => {
     setSearchFilters(filters);
+    setCurrentPage(1);
   }, []);
 
   const filteredVouchers = useMemo(() => savedVouchers.filter(voucher => {
@@ -808,12 +806,19 @@ const handleDeleteVoucher = async (voucher) => {
       (filters.status === 'balanced' && voucher.balanced) ||
       (filters.status === 'unbalanced' && !voucher.balanced);
 
-    const journalTypeMatch = !filters.journalType || voucher.journalType === filters.journalType;
+    const voucherJournalType = voucher.journalType || voucher.natureOfTransaction || '';
+    const journalTypeMatch = !filters.journalType || voucherJournalType === filters.journalType;
 
-    return searchMatch && dateFromMatch && dateToMatch && amountMinMatch && 
-           amountMaxMatch && nameOfSchemeMatch && nameOfWorkMatch && fundTypeMatch && 
+    return searchMatch && dateFromMatch && dateToMatch && amountMinMatch &&
+           amountMaxMatch && nameOfSchemeMatch && nameOfWorkMatch && fundTypeMatch &&
            statusMatch && journalTypeMatch;
   }), [savedVouchers, searchFilters]);
+
+  const totalPages = Math.ceil(filteredVouchers.length / ITEMS_PER_PAGE);
+  const paginatedVouchers = filteredVouchers.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   const resetFormHandler = () => {
     resetForm(initialFormData, initialDebitEntries, initialCreditEntries);
@@ -867,6 +872,10 @@ const handleDeleteVoucher = async (voucher) => {
           loading={loading}
           gradientFrom="from-purple-500"
           gradientTo="to-indigo-500"
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          pageSize={ITEMS_PER_PAGE}
           customFilters={[
             {
               key: 'journalType',
@@ -1065,7 +1074,10 @@ const handleDeleteVoucher = async (voucher) => {
                   )}
                 </div>
               ))} */}
-              {filteredVouchers.map((voucher) => (
+              {paginatedVouchers.map((voucher) => {
+  const jType = voucher.journalType || voucher.natureOfTransaction || '';
+  const vDescription = voucher.description || voucher.narration || '';
+  return (
   <div
     key={voucher.id}
     className="bg-gradient-to-r from-white to-gray-50 border border-purple-200 rounded-xl p-6 hover:shadow-md transition-shadow"
@@ -1077,7 +1089,7 @@ const handleDeleteVoucher = async (voucher) => {
         </div>
         <div>
           <h3 className="text-lg font-semibold text-gray-900">
-            {voucher.journalType} - {voucher.journalNo}
+            {jType} - {voucher.journalNo}
           </h3>
           <p className="text-sm text-gray-600">
             Date: {voucher.journalDate} | Fund: {voucher.fundType}
@@ -1088,16 +1100,16 @@ const handleDeleteVoucher = async (voucher) => {
           {voucher.nameOfWork && (
             <p className="text-sm text-gray-600">Work: {voucher.nameOfWork}</p>
           )}
-          {voucher.journalType === 'CJV' && voucher.nameOfContractor && (
+          {jType === 'CJV' && voucher.nameOfContractor && (
             <p className="text-sm text-blue-600">Contractor: {voucher.nameOfContractor}</p>
           )}
-          {voucher.journalType === 'PJV' && voucher.nameOfSupplier && (
+          {jType === 'PJV' && voucher.nameOfSupplier && (
             <p className="text-sm text-blue-600">Supplier: {voucher.nameOfSupplier}</p>
           )}
-          {voucher.journalType === 'EJV' && voucher.nameOfEmployee && (
+          {jType === 'EJV' && voucher.nameOfEmployee && (
             <p className="text-sm text-blue-600">Employee: {voucher.nameOfEmployee}</p>
           )}
-          {voucher.journalType === 'EJV' && voucher.employeeEntries && voucher.employeeEntries.length > 0 && (
+          {jType === 'EJV' && voucher.employeeEntries && voucher.employeeEntries.length > 0 && (
             <p className="text-sm text-blue-600">Multiple Employees: {voucher.employeeEntries.length} entries</p>
           )}
         </div>
@@ -1283,16 +1295,17 @@ const handleDeleteVoucher = async (voucher) => {
       )}
     </div>
     
-    {voucher.description  && (
+    {vDescription && (
       <div className="mt-4 p-3 bg-blue-50 rounded-lg">
         <p className="text-sm text-gray-700">
-          <span className="font-medium text-gray-900">description : </span>
-          {voucher.description }
+          <span className="font-medium text-gray-900">Description: </span>
+          {vDescription}
         </p>
       </div>
     )}
   </div>
-))}
+  );
+})}
             </div>
           )}
         </SearchableRecords>

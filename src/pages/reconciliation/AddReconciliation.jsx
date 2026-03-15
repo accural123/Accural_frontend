@@ -35,6 +35,8 @@ import { createVoucherService } from "../../services/createVoucherService";
 import { fundService } from "../../services/apiServices";
 import { ResetButton } from '../../components/common/ResetButton';
 
+const ITEMS_PER_PAGE = 20;
+
 const AddReconciliation = () => {
   const { toasts, showToast, removeToast } = useToast();
   const { executeApi, loading, error, clearError } = useApiService();
@@ -77,6 +79,7 @@ const AddReconciliation = () => {
     }
   ]);
 
+  const [currentPage, setCurrentPage] = useState(1);
   const [savedReconciliations, setSavedReconciliations] = useState([]);
   const [showRecords, setShowRecords] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -380,12 +383,18 @@ const AddReconciliation = () => {
     reconciliation.debitCredit?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     reconciliation.voucherType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     reconciliation.transactionType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    reconciliation.entries?.some(entry => 
+    reconciliation.entries?.some(entry =>
       entry.bankCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       entry.type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       entry.voucherNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       entry.chequeNo?.toLowerCase().includes(searchTerm.toLowerCase())
     )
+  );
+
+  const totalPages = Math.ceil(filteredReconciliations.length / ITEMS_PER_PAGE);
+  const paginatedReconciliations = filteredReconciliations.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
   );
 
   const resetFormHandler = () => {
@@ -427,6 +436,10 @@ const AddReconciliation = () => {
           loading={loading}
           gradientFrom="from-purple-500"
           gradientTo="to-pink-500"
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          pageSize={ITEMS_PER_PAGE}
         >
           {filteredReconciliations.length === 0 ? (
             <EmptyState
@@ -438,7 +451,7 @@ const AddReconciliation = () => {
             />
           ) : (
             <div className="space-y-4">
-              {filteredReconciliations.map((reconciliation) => (
+              {paginatedReconciliations.map((reconciliation) => (
                 <div
                   key={reconciliation.id}
                   className="bg-gradient-to-r from-white to-gray-50 border border-purple-200 rounded-xl p-6 hover:shadow-md transition-shadow"

@@ -28,6 +28,8 @@ import { ResetButton } from '../../components/common/ResetButton';
 import { ConfirmDialog, useConfirmDialog } from "../../components/common/Popup";
 import { VoiceInputField } from '../../components/common/VoiceInputField';
 
+const ITEMS_PER_PAGE = 20;
+
 const BankReceipt = () => {
   const { toasts, showToast, removeToast } = useToast();
     const [errors, setErrors] = useState({});
@@ -106,6 +108,7 @@ const BankReceipt = () => {
     resetForm
   } = useVoucherForm(initialFormData, initialDebitEntries, initialCreditEntries);
 
+  const [currentPage, setCurrentPage] = useState(1);
   const [savedVouchers, setSavedVouchers] = useState([]);
   const [showRecords, setShowRecords] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -431,12 +434,13 @@ const BankReceipt = () => {
 
   const handleAdvancedFilters = (filters) => {
     setSearchFilters(filters);
+    setCurrentPage(1);
   };
 
   const filteredVouchers = savedVouchers.filter(voucher => {
     const filters = searchFilters;
-    
-    const searchMatch = !filters.searchTerm || 
+
+    const searchMatch = !filters.searchTerm ||
       voucher.brvNo?.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
       voucher.fromWhom?.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
       voucher.fundType?.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
@@ -465,10 +469,16 @@ const BankReceipt = () => {
 
     const brvTypeMatch = !filters.brvType || voucher.brvType === filters.brvType;
 
-    return searchMatch && dateFromMatch && dateToMatch && amountMinMatch && 
-           amountMaxMatch && fromWhomMatch && fundTypeMatch && statusMatch && 
+    return searchMatch && dateFromMatch && dateToMatch && amountMinMatch &&
+           amountMaxMatch && fromWhomMatch && fundTypeMatch && statusMatch &&
            transactionModeMatch && brvTypeMatch;
   });
+
+  const totalPages = Math.ceil(filteredVouchers.length / ITEMS_PER_PAGE);
+  const paginatedVouchers = filteredVouchers.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   const resetFormHandler = () => {
     resetForm(initialFormData, initialDebitEntries, initialCreditEntries);
@@ -886,6 +896,10 @@ const BankReceipt = () => {
           loading={loading}
           gradientFrom="from-teal-500"
           gradientTo="to-cyan-500"
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          pageSize={ITEMS_PER_PAGE}
           customFilters={[
             {
               key: 'brvType',
@@ -910,7 +924,7 @@ const BankReceipt = () => {
             />
           ) : (
             <div className="space-y-4">
-              {filteredVouchers.map((voucher) => (
+              {paginatedVouchers.map((voucher) => (
                 <div
                   key={voucher.id}
                   className="bg-gradient-to-r from-white to-gray-50 border border-teal-200 rounded-xl p-6 hover:shadow-md transition-shadow"

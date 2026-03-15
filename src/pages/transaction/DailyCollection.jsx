@@ -47,6 +47,8 @@ import { createVoucherService } from '../../services/createVoucherService';
 import { ResetButton } from '../../components/common/ResetButton';
 import { ConfirmDialog, useConfirmDialog } from "../../components/common/Popup";
 
+const ITEMS_PER_PAGE = 20;
+
 const DailyCollection = () => {
   const { toasts, showToast, removeToast } = useToast();
   const { executeApi, loading, error, clearError } = useApiService();
@@ -98,6 +100,7 @@ const DailyCollection = () => {
     resetForm
   } = useVoucherForm(initialFormData, initialDebitEntries, initialCreditEntries);
 
+  const [currentPage, setCurrentPage] = useState(1);
   const [savedRecords, setSavedRecords] = useState([]);
   const [showRecords, setShowRecords] = useState(false);
   const [availableFunds, setAvailableFunds] = useState([]);
@@ -323,6 +326,7 @@ const DailyCollection = () => {
 
   const handleAdvancedFilters = (filters) => {
     setSearchFilters(filters);
+    setCurrentPage(1);
   };
 
   const filteredRecords = useMemo(() => savedRecords.filter(record => {
@@ -353,9 +357,15 @@ const DailyCollection = () => {
       (filters.status === 'balanced' && record.balanced) ||
       (filters.status === 'unbalanced' && !record.balanced);
 
-    return searchMatch && dateFromMatch && dateToMatch && amountMinMatch && 
+    return searchMatch && dateFromMatch && dateToMatch && amountMinMatch &&
            amountMaxMatch && fromWhomMatch && fundTypeMatch && statusMatch;
   }), [savedRecords, searchFilters]);
+
+  const totalPages = Math.ceil(filteredRecords.length / ITEMS_PER_PAGE);
+  const paginatedRecords = filteredRecords.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   const resetFormHandler = () => {
     resetForm(initialFormData, initialDebitEntries, initialCreditEntries);
@@ -398,6 +408,10 @@ const DailyCollection = () => {
           loading={loading}
           gradientFrom="from-blue-500"
           gradientTo="to-green-500"
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          pageSize={ITEMS_PER_PAGE}
         >
           {filteredRecords.length === 0 ? (
             <EmptyState
@@ -409,7 +423,7 @@ const DailyCollection = () => {
             />
           ) : (
             <div className="space-y-4">
-              {filteredRecords.map((record) => (
+              {paginatedRecords.map((record) => (
                 <div
                   key={record.id}
                   className="bg-gradient-to-r from-white to-gray-50 border border-blue-200 rounded-xl p-6 hover:shadow-md transition-shadow"

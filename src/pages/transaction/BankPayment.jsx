@@ -30,6 +30,8 @@ import { VoiceInputField } from '../../components/common/VoiceInputField';
 
 
 
+const ITEMS_PER_PAGE = 20;
+
 const BankPayment = () => {
   const { toasts, showToast, removeToast } = useToast();
   const { executeApi, loading, error, clearError } = useApiService();
@@ -95,6 +97,7 @@ const { dialogState, showConfirmDialog, closeDialog } = useConfirmDialog();
     resetForm
   } = useVoucherForm(initialFormData, initialDebitEntries, initialCreditEntries);
 
+  const [currentPage, setCurrentPage] = useState(1);
   const [savedVouchers, setSavedVouchers] = useState([]);
   const [showRecords, setShowRecords] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -372,6 +375,7 @@ const handleSubmit = async () => {
 
   const handleAdvancedFilters = (filters) => {
     setSearchFilters(filters);
+    setCurrentPage(1);
   };
 
   const filteredVouchers = savedVouchers.filter(voucher => {
@@ -410,6 +414,12 @@ const handleSubmit = async () => {
            amountMaxMatch && inFavourOfMatch && fundTypeMatch && statusMatch &&
            transactionModeMatch && bpvTypeMatch;
   });
+
+  const totalPages = Math.ceil(filteredVouchers.length / ITEMS_PER_PAGE);
+  const paginatedVouchers = filteredVouchers.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   const resetFormHandler = () => {
     resetForm(initialFormData, initialDebitEntries, initialCreditEntries);
@@ -703,6 +713,10 @@ const handleSubmit = async () => {
           loading={loading}
           gradientFrom="from-red-500"
           gradientTo="to-orange-500"
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          pageSize={ITEMS_PER_PAGE}
           customFilters={[
             {
               key: 'bpvType',
@@ -727,7 +741,7 @@ const handleSubmit = async () => {
             />
           ) : (
             <div className="space-y-4">
-              {filteredVouchers.map((voucher) => (
+              {paginatedVouchers.map((voucher) => (
                 <div
                   key={voucher.id}
                   className="bg-gradient-to-r from-white to-gray-50 border border-red-200 rounded-xl p-6 hover:shadow-md transition-shadow"

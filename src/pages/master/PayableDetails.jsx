@@ -30,6 +30,8 @@ const EMPLOYEE_LEDGERS = [
   { code: '1002', name: 'Info Ledger' },
 ];
 
+const ITEMS_PER_PAGE = 20;
+
 const PayableDetails = () => {
   const { toasts, showToast, removeToast } = useToast();
   const { executeApi, loading, error, clearError } = useApiService();
@@ -65,6 +67,7 @@ const PayableDetails = () => {
     status: 'Pending'
   });
 
+  const [currentPage, setCurrentPage] = useState(1);
   const [accounts, setAccounts] = useState([]);
   const [savedRecords, setSavedRecords] = useState([]);
   const [showRecords, setShowRecords] = useState(false);
@@ -592,6 +595,7 @@ const PayableDetails = () => {
 
   const handleAdvancedFilters = (filters) => {
     setSearchFilters(filters);
+    setCurrentPage(1);
   };
 
   const filteredRecords = savedRecords.filter(record => {
@@ -615,9 +619,15 @@ const PayableDetails = () => {
     const voucherTypeMatch = !filters.voucherType || record.voucherType === filters.voucherType;
     const financialYearMatch = !filters.financialYear || record.financialYear === filters.financialYear;
 
-    return searchMatch && dateFromMatch && dateToMatch && amountMinMatch && 
+    return searchMatch && dateFromMatch && dateToMatch && amountMinMatch &&
            amountMaxMatch && statusMatch && voucherTypeMatch && financialYearMatch;
   });
+
+  const totalPages = Math.ceil(filteredRecords.length / ITEMS_PER_PAGE);
+  const paginatedRecords = filteredRecords.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   return (
     <div className="space-y-6">
@@ -650,6 +660,10 @@ const PayableDetails = () => {
           onFiltersChange={handleAdvancedFilters}
           loading={loading}
           gradientFrom="from-red-500"
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          pageSize={ITEMS_PER_PAGE}
           gradientTo="to-pink-500"
           customFilters={[
             {
@@ -684,7 +698,7 @@ const PayableDetails = () => {
             />
           ) : (
             <div className="space-y-4">
-              {filteredRecords.map((record) => (
+              {paginatedRecords.map((record) => (
                 <div
                   key={record.id}
                   className="bg-gradient-to-r from-white to-gray-50 border border-red-200 rounded-xl p-6 hover:shadow-md transition-shadow"

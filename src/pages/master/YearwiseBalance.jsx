@@ -10,8 +10,12 @@ import { Calculator, TrendingUp, AlertCircle, CheckCircle, Plus, Save, RefreshCw
 import { ErrorDisplay } from '../../components/common/ErrorDisplay';
 import SearchableDropdown from '../../components/common/SearchableDropdown';
 import { ConfirmDialog, useConfirmDialog } from "../../components/common/Popup";
+import Pagination from '../../components/common/Pagination';
+const ITEMS_PER_PAGE = 20;
+
 const YearwiseBalance = () => {
   const { dialogState, showConfirmDialog, closeDialog } = useConfirmDialog();
+  const [currentPage, setCurrentPage] = useState(1);
   const [selectedFundType, setSelectedFundType] = useState('');
   const [selectedTaxType, setSelectedTaxType] = useState('Property Tax');
   const [balanceData, setBalanceData] = useState([]);
@@ -327,9 +331,15 @@ const handleDeleteRecord = async (id) => {
   const filteredRecords = savedRecords.filter(record =>
     record.fundType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     record.taxType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    record.balanceData?.some(entry => 
+    record.balanceData?.some(entry =>
       entry.year?.toLowerCase().includes(searchTerm.toLowerCase())
     )
+  );
+
+  const totalPages = Math.ceil(filteredRecords.length / ITEMS_PER_PAGE);
+  const paginatedRecords = filteredRecords.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
   );
 
   const columns = [
@@ -428,7 +438,7 @@ const handleDeleteRecord = async (id) => {
                   type="text"
                   placeholder="Search records..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                   onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                   className="pl-10 pr-4 py-2 bg-white/20 backdrop-blur-sm border border-white/30 rounded-lg text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/50"
                 />
@@ -459,12 +469,22 @@ const handleDeleteRecord = async (id) => {
                   )}
                 </div>
               ) : (
-                <DataTable
-                  columns={recordColumns}
-                  data={filteredRecords}
-                  onEdit={handleEditRecord}
-                  onDelete={handleDeleteRecord}
-                />
+                <>
+                  <DataTable
+                    columns={recordColumns}
+                    data={paginatedRecords}
+                    onEdit={handleEditRecord}
+                    onDelete={handleDeleteRecord}
+                  />
+                  {totalPages > 1 && (
+                    <Pagination
+                      currentPage={currentPage}
+                      totalPages={totalPages}
+                      onPageChange={setCurrentPage}
+                      pageSize={ITEMS_PER_PAGE}
+                    />
+                  )}
+                </>
               )}
             </div>
           )}

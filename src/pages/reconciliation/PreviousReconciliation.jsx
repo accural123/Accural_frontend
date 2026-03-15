@@ -36,6 +36,8 @@ import { fundService } from "../../services/apiServices";
 import { ResetButton } from '../../components/common/ResetButton';
 import { VoiceInputField } from '../../components/common/VoiceInputField';
 
+const ITEMS_PER_PAGE = 20;
+
 const PreviousReconciliation = () => {
   const { toasts, showToast, removeToast } = useToast();
   const { executeApi, loading, error, clearError } = useApiService();
@@ -54,6 +56,7 @@ const PreviousReconciliation = () => {
     description : ''
   };
 
+  const [currentPage, setCurrentPage] = useState(1);
   const [formData, setFormData] = useState(initialFormData);
   const [savedReconciliations, setSavedReconciliations] = useState([]);
   const [showRecords, setShowRecords] = useState(false);
@@ -331,6 +334,12 @@ const PreviousReconciliation = () => {
     reconciliation.description ?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const totalPages = Math.ceil(filteredReconciliations.length / ITEMS_PER_PAGE);
+  const paginatedReconciliations = filteredReconciliations.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
   const resetFormHandler = () => {
     resetForm();
     setShowRecords(false);
@@ -368,6 +377,10 @@ const PreviousReconciliation = () => {
           loading={loading}
           gradientFrom="from-purple-500"
           gradientTo="to-pink-500"
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          pageSize={ITEMS_PER_PAGE}
         >
           {filteredReconciliations.length === 0 ? (
             <EmptyState
@@ -379,7 +392,7 @@ const PreviousReconciliation = () => {
             />
           ) : (
             <div className="space-y-4">
-              {filteredReconciliations.map((reconciliation) => (
+              {paginatedReconciliations.map((reconciliation) => (
                 <div
                   key={reconciliation.id}
                   className="bg-gradient-to-r from-white to-gray-50 border border-purple-200 rounded-xl p-6 hover:shadow-md transition-shadow"

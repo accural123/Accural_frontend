@@ -16,6 +16,9 @@ import { EmptyState } from '../../components/common/EmptyState';
 // Import utilities
 import { showConfirmDialog } from '../../utils/confirmDialog';
 import { createVoucherService } from '../../services/createVoucherService';
+import Pagination from '../../components/common/Pagination';
+
+const ITEMS_PER_PAGE = 20;
 
 const JournalVoucherCorrection = () => {
   const { toasts, showToast, removeToast } = useToast();
@@ -23,6 +26,7 @@ const JournalVoucherCorrection = () => {
   const { getWorkspaceSelection } = useAuth();
   const userSession = getWorkspaceSelection();
   
+  const [currentPage, setCurrentPage] = useState(1);
   const [journalVouchers, setJournalVouchers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -92,6 +96,12 @@ const JournalVoucherCorrection = () => {
     voucher.narration?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const totalPages = Math.ceil(filteredVouchers.length / ITEMS_PER_PAGE);
+  const paginatedVouchers = filteredVouchers.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
   return (
     <div className="space-y-6">
       <ToastContainer toasts={toasts} removeToast={removeToast} />
@@ -121,7 +131,7 @@ const JournalVoucherCorrection = () => {
           type="text"
           placeholder="Search by Journal No, Nature, Date, Scheme, Work, or Narration..."
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
         />
       </div>
@@ -149,7 +159,7 @@ const JournalVoucherCorrection = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {filteredVouchers.map((voucher, index) => {
+              {paginatedVouchers.map((voucher, index) => {
                 const transactionType = getTransactionTypeDisplay(voucher.natureOfTransaction);
                 
                 return (
@@ -292,8 +302,16 @@ const JournalVoucherCorrection = () => {
       
       {filteredVouchers.length > 0 && (
         <div className="text-center text-sm text-gray-500">
-          Showing {filteredVouchers.length} of {journalVouchers.length} vouchers
+          Showing {paginatedVouchers.length} of {filteredVouchers.length} vouchers
         </div>
+      )}
+      {totalPages > 1 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          pageSize={ITEMS_PER_PAGE}
+        />
       )}
     </div>
   );

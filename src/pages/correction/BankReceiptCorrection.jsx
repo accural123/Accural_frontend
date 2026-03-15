@@ -16,6 +16,9 @@ import { EmptyState } from '../../components/common/EmptyState';
 // Import utilities
 import { showConfirmDialog } from '../../utils/confirmDialog';
 import { createVoucherService } from '../../services/createVoucherService';
+import Pagination from '../../components/common/Pagination';
+
+const ITEMS_PER_PAGE = 20;
 
 const BankReceiptCorrection = () => {
   const { toasts, showToast, removeToast } = useToast();
@@ -23,6 +26,7 @@ const BankReceiptCorrection = () => {
   const { getWorkspaceSelection } = useAuth();
   const userSession = getWorkspaceSelection();
   
+  const [currentPage, setCurrentPage] = useState(1);
   const [bankReceiptVouchers, setBankReceiptVouchers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -77,6 +81,12 @@ const BankReceiptCorrection = () => {
     voucher.brvDate?.includes(searchTerm)
   );
 
+  const totalPages = Math.ceil(filteredVouchers.length / ITEMS_PER_PAGE);
+  const paginatedVouchers = filteredVouchers.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
   return (
     <div className="space-y-6">
       <ToastContainer toasts={toasts} removeToast={removeToast} />
@@ -106,7 +116,7 @@ const BankReceiptCorrection = () => {
           type="text"
           placeholder="Search by BRV No, From Whom, Fund Type, or Date..."
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
         />
       </div>
@@ -133,7 +143,7 @@ const BankReceiptCorrection = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {filteredVouchers.map((voucher, index) => (
+              {paginatedVouchers.map((voucher, index) => (
                 <tr key={voucher.id} className={`hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-25'}`}>
                   <td className="px-6 py-4">
                     <div className="space-y-1">
@@ -229,8 +239,16 @@ const BankReceiptCorrection = () => {
       
       {filteredVouchers.length > 0 && (
         <div className="text-center text-sm text-gray-500">
-          Showing {filteredVouchers.length} of {bankReceiptVouchers.length} vouchers
+          Showing {paginatedVouchers.length} of {filteredVouchers.length} vouchers
         </div>
+      )}
+      {totalPages > 1 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          pageSize={ITEMS_PER_PAGE}
+        />
       )}
     </div>
   );
