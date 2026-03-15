@@ -10,7 +10,10 @@ import { voucherTypeService } from "../../services/realServices";
 import { useApiService } from "../../hooks/useApiService";
 import { ErrorDisplay } from '../../components/common/ErrorDisplay';
 import { ConfirmDialog, useConfirmDialog } from "../../components/common/Popup";
+import Pagination from '../../components/common/Pagination';
 import { useAuth } from '../../context/AuthContext';
+
+const ITEMS_PER_PAGE = 10;
 
 const VoucherTypeCreation = () => {
   const { dialogState, showConfirmDialog, closeDialog } = useConfirmDialog();
@@ -35,6 +38,7 @@ const VoucherTypeCreation = () => {
   const [editingId, setEditingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [submitLoading, setSubmitLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const { executeApi, loading, error, clearError } = useApiService();
 
@@ -272,6 +276,12 @@ const VoucherTypeCreation = () => {
     vt.selectTypeOfVoucher?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const totalPages = Math.ceil(filteredVoucherTypes.length / ITEMS_PER_PAGE);
+  const paginatedVoucherTypes = filteredVoucherTypes.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
   return (
     <div className="space-y-6">
       <ErrorDisplay error={error} onClear={clearError} />
@@ -422,7 +432,7 @@ const VoucherTypeCreation = () => {
                   type="text"
                   placeholder="Search voucher types..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                   onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                   className="pl-10 pr-4 py-2 bg-white/20 backdrop-blur-sm border border-white/30 rounded-lg text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/50"
                 />
@@ -447,7 +457,7 @@ const VoucherTypeCreation = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white/40 divide-y divide-slate-200">
-                  {filteredVoucherTypes.map((voucherType) => (
+                  {paginatedVoucherTypes.map((voucherType) => (
                     <tr key={voucherType.id} className="hover:bg-white/60 transition-colors">
                       <td className="px-6 py-4">
                         <div>
@@ -486,6 +496,15 @@ const VoucherTypeCreation = () => {
             </div>
           )}
           
+          {totalPages > 1 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              pageSize={ITEMS_PER_PAGE}
+            />
+          )}
+
           {!loading && filteredVoucherTypes.length === 0 && (
             <div className="text-center py-8">
               <Receipt className="h-12 w-12 text-slate-400 mx-auto mb-4" />

@@ -29,12 +29,7 @@ const Pagination = ({ currentPage, totalPages, onPageChange, totalRecords, pageS
 
   return (
     <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-2 pt-4 mt-4 border-t border-slate-200">
-      <p className="text-sm text-slate-500">
-        Showing{' '}
-        <span className="font-semibold text-slate-700">{startEntry}</span>–
-        <span className="font-semibold text-slate-700">{endEntry}</span> of{' '}
-        <span className="font-semibold text-slate-700">{totalRecords}</span> entries
-      </p>
+      
 
       <div className="flex items-center gap-1">
         <button

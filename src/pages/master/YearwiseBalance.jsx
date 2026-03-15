@@ -255,8 +255,16 @@ const deleteEntry = async (entry) => {
 
   const handleEditRecord = (record) => {
     setSelectedFundType(record.fundType || '');
-    setSelectedTaxType(record.taxType);
-    setBalanceData(record.balanceData || []);
+    setSelectedTaxType(record.taxType || 'Property Tax');
+    // API returns flat records; convert to local balanceData format
+    setBalanceData([{
+      id: record.id,
+      slNo: 1,
+      year: record.financialYear || record.year || '',
+      demand: Number(record.demand) || 0,
+      collection: Number(record.collection) || 0,
+      balance: Number(record.balance) || 0
+    }]);
     setEditingRecordId(record.id);
     setShowRecords(false);
     clearError();
@@ -331,9 +339,8 @@ const handleDeleteRecord = async (id) => {
   const filteredRecords = savedRecords.filter(record =>
     record.fundType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     record.taxType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    record.balanceData?.some(entry =>
-      entry.year?.toLowerCase().includes(searchTerm.toLowerCase())
-    )
+    record.year?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    record.financialYear?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const totalPages = Math.ceil(filteredRecords.length / ITEMS_PER_PAGE);
@@ -361,24 +368,27 @@ const handleDeleteRecord = async (id) => {
   const recordColumns = [
     { key: 'fundType', title: 'Fund Type', sortable: true },
     { key: 'taxType', title: 'Tax Type', sortable: true },
-    { key: 'yearsCount', title: 'Years', render: (value) => `${value} years` },
-    { key: 'totalDemand', title: 'Total Demand (₹)', render: (value) => value?.toLocaleString('en-IN', { minimumFractionDigits: 2 }) },
-    { key: 'totalCollection', title: 'Total Collection (₹)', render: (value) => value?.toLocaleString('en-IN', { minimumFractionDigits: 2 }) },
-    { key: 'totalBalance', title: 'Total Balance (₹)', render: (value) => value?.toLocaleString('en-IN', { minimumFractionDigits: 2 }) },
-    { 
-      key: 'collectionEfficiency', 
-      title: 'Efficiency %', 
-      render: (value) => (
-        <span className={`px-2 py-1 rounded text-xs font-medium ${
-          value >= 100 ? 'bg-purple-100 text-purple-800' : 
-          value >= 80 ? 'bg-green-100 text-green-800' : 
-          value >= 60 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
-        }`}>
-          {value?.toFixed(1)}%
-        </span>
-      )
-    },
-    { key: 'createdDate', title: 'Created Date', sortable: true }
+    { key: 'year', title: 'Year', sortable: true, render: (_v, row) => row.financialYear || row.year || '—' },
+    { key: 'demand', title: 'Demand (₹)', render: (value) => value != null ? Number(value).toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '—' },
+    { key: 'collection', title: 'Collection (₹)', render: (value) => value != null ? Number(value).toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '—' },
+    { key: 'balance', title: 'Balance (₹)', render: (value) => value != null ? Number(value).toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '—' },
+    {
+      key: 'collectionEfficiency',
+      title: 'Efficiency %',
+      render: (value) => {
+        const eff = value != null ? Number(value) : null;
+        if (eff == null) return '—';
+        return (
+          <span className={`px-2 py-1 rounded text-xs font-medium ${
+            eff >= 100 ? 'bg-purple-100 text-purple-800' :
+            eff >= 80 ? 'bg-green-100 text-green-800' :
+            eff >= 60 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
+          }`}>
+            {eff.toFixed(1)}%
+          </span>
+        );
+      }
+    }
   ];
 
   return (
@@ -568,6 +578,7 @@ const handleDeleteRecord = async (id) => {
                   value={newEntry.year}
                   onChange={handleNewEntryChange}
                   placeholder="e.g., 2024-2025"
+                  required
                 />
                 
                 <FormField

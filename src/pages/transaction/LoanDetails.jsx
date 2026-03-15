@@ -690,6 +690,7 @@ const handleDelete = async (id) => {
                 name="rateOfInterest"
                 value={formData.rateOfInterest}
                 onChange={handleChange}
+                required={formData.loanType === 'interest_loan'}
                 error={errors.rateOfInterest}
                 icon={Percent}
                 placeholder="Enter interest rate"

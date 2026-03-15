@@ -1,22 +1,20 @@
 
 import React, { useState, useEffect } from 'react';
-import { Card } from "../../components/common/Card";
 import { FormField } from "../../components/common/FormField";
-import { SubmitButton } from "../../components/common/SubmitButton";
 import { DataTable } from "../../components/common/DataTable";
 import { ToastContainer } from "../../components/common/ToastContainer";
 import { ConfirmDialog, useConfirmDialog } from "../../components/common/Popup";
 import SearchableDropdown from "../../components/common/SearchableDropdown";
 import WorkDetails from "../../components/common/WorkDetails";
-import EmployeeDetails from "../../components/common/EmployeeDetails";
 import { advanceDepositService, accountService } from "../../services/realServices";
 import { useApiService } from "../../hooks/useApiService";
 import { useToast } from "../../hooks/useToast";
-import { CreditCard, Receipt, AlertCircle, CheckCircle, Plus, Save, RefreshCw, Eye, FileText, Search, X, Calendar, DollarSign, User, Hash, Building, Trash2, Edit3 } from 'lucide-react';
+import { CreditCard, Receipt, AlertCircle, Plus, Save, RefreshCw, Eye, FileText, Search, X, Calendar, DollarSign, Users, Hash, Building } from 'lucide-react';
 import ErrorDisplay from '../../components/common/ErrorDisplay';
 import { VoiceInputField } from '../../components/common/VoiceInputField';
-import MultipleEmployeeEntry from '../../components/common/MultipleEmployeeEntry';
 import Pagination from '../../components/common/Pagination';
+import EmployeeSelector from '../transaction/employee/EmployeeSelector';
+
 
 const ITEMS_PER_PAGE = 20;
 
@@ -68,6 +66,7 @@ const AdvanceDeposits = ({
   const [employeeEntries, setEmployeeEntries] = useState([]);
   const [showWorkDetails, setShowWorkDetails] = useState(false);
   const [showEmployeeDetails, setShowEmployeeDetails] = useState(false);
+  const [viewingEmployeeRecord, setViewingEmployeeRecord] = useState(null);
 
   const { executeApi, loading, error, clearError } = useApiService();
   const { toasts, showToast, removeToast } = useToast();
@@ -194,9 +193,10 @@ const AdvanceDeposits = ({
     
     // Reset optional sections when voucher type changes
     setShowWorkDetails(false);
-    setShowEmployeeDetails(false);
-    setShowMultipleEmployees(false);
-    setEmployeeEntries([]);
+    setShowEmployeeDetails(voucherType === 'EJV');
+    setShowMultipleEmployees(voucherType === 'EJV');
+    if (voucherType !== 'EJV') setEmployeeEntries([]);
+    setViewingEmployeeRecord(null);
     
     // Clear related form fields
     if (voucherType !== 'CJV' && voucherType !== 'PJV') {
@@ -437,28 +437,24 @@ const AdvanceDeposits = ({
     setShowEmployeeDetails(false);
     setShowMultipleEmployees(false);
     setEmployeeEntries([]);
+    setViewingEmployeeRecord(null);
     clearError();
   };
 
   const handleEdit = (record) => {
     const hasWorkDetails = record.nameOfWork || record.nameOfContractor || record.nameOfSupplier || record.nameOfScheme;
     const hasMultipleEmployees = record.employeeEntries && Array.isArray(record.employeeEntries) && record.employeeEntries.length > 0;
-    const hasSingleEmployee = record.nameOfEmployee && record.nameOfEmployee.trim() !== '';
     
     if (record.voucherType === 'EJV') {
-      setShowEmployeeDetails(hasSingleEmployee || hasMultipleEmployees);
-      if (hasMultipleEmployees) {
-        setEmployeeEntries(record.employeeEntries);
-        setShowMultipleEmployees(true);
-      } else {
-        setEmployeeEntries([]);
-        setShowMultipleEmployees(false);
-      }
+      setShowEmployeeDetails(true);
+      setShowMultipleEmployees(true);
+      setEmployeeEntries(hasMultipleEmployees ? record.employeeEntries : []);
     } else {
       setShowEmployeeDetails(false);
-      setEmployeeEntries([]);
       setShowMultipleEmployees(false);
+      setEmployeeEntries([]);
     }
+    setViewingEmployeeRecord(null);
     
     if (record.voucherType === 'CJV' || record.voucherType === 'PJV') {
       setShowWorkDetails(hasWorkDetails);
@@ -499,10 +495,6 @@ const AdvanceDeposits = ({
     setTimeout(() => {
       window.scrollTo(0, 0);
     }, 100);
-  };
-
-  const mockShowConfirmDialog = async (title, message, confirmText, cancelText) => {
-    return window.confirm(`${title}\n\n${message}`);
   };
 
   const handleDelete = async (record) => {
@@ -582,6 +574,24 @@ const AdvanceDeposits = ({
     { key: 'voucherType', title: 'Voucher Type' },
     { key: 'amount', title: 'Amount (₹)', render: (value) => value?.toLocaleString('en-IN', { minimumFractionDigits: 2 }) },
     { key: 'nameDesignation', title: 'Name & Designation' },
+    {
+      key: 'employeeEntries',
+      title: 'Employees',
+      render: (_value, row) => {
+        const entries = row.employeeEntries;
+        if (!entries || entries.length === 0) return <span className="text-gray-400 text-xs">—</span>;
+        const isViewing = viewingEmployeeRecord?.id === row.id;
+        return (
+          <button
+            onClick={(e) => { e.stopPropagation(); setViewingEmployeeRecord(isViewing ? null : row); }}
+            className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium transition-colors ${isViewing ? 'bg-orange-200 text-orange-800' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'}`}
+          >
+            <Users className="h-3 w-3" />
+            <span>{entries.length} emp{entries.length !== 1 ? 's' : ''}</span>
+          </button>
+        );
+      }
+    },
     { key: 'status', title: 'Status', render: (value) => (
       <span className={`px-2 py-1 rounded-full text-xs font-medium ${value === 'Active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
         {value || 'Active'}
@@ -656,7 +666,7 @@ const AdvanceDeposits = ({
                   placeholder="Search records..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                   className="pl-10 pr-10 py-2 bg-white/20 backdrop-blur-sm border border-white/30 rounded-lg text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/50"
                 />
                 {searchTerm && (
@@ -708,6 +718,69 @@ const AdvanceDeposits = ({
                       onPageChange={setCurrentPage}
                       pageSize={ITEMS_PER_PAGE}
                     />
+                  )}
+                  {/* Employee Entries Detail Panel */}
+                  {viewingEmployeeRecord && viewingEmployeeRecord.employeeEntries?.length > 0 && (
+                    <div className="m-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-md font-semibold text-orange-800 flex items-center">
+                          <Users className="h-4 w-4 mr-2" />
+                          Employee Details — {viewingEmployeeRecord.nameDesignation} ({viewingEmployeeRecord.employeeEntries.length} employee{viewingEmployeeRecord.employeeEntries.length !== 1 ? 's' : ''})
+                        </h4>
+                        <button onClick={() => setViewingEmployeeRecord(null)} className="text-orange-500 hover:text-orange-800">
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead className="bg-orange-100">
+                            <tr>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-orange-700 uppercase">Emp ID</th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-orange-700 uppercase">Name</th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-orange-700 uppercase">Designation</th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-orange-700 uppercase">Section</th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-orange-700 uppercase">Period</th>
+                              <th className="px-3 py-2 text-right text-xs font-medium text-orange-700 uppercase">Amount (₹)</th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-orange-700 uppercase">Ledger Breakdown</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-orange-100">
+                            {viewingEmployeeRecord.employeeEntries.map((emp, idx) => (
+                              <tr key={idx} className="hover:bg-orange-50">
+                                <td className="px-3 py-2 text-gray-600">{emp.empId || '—'}</td>
+                                <td className="px-3 py-2 font-medium text-gray-900">{emp.nameOfEmployee}</td>
+                                <td className="px-3 py-2 text-gray-700">{emp.designation}</td>
+                                <td className="px-3 py-2 text-gray-700">{emp.section}</td>
+                                <td className="px-3 py-2 text-gray-700">{emp.monthYear}</td>
+                                <td className="px-3 py-2 text-right font-semibold text-green-700">
+                                  ₹{(emp.employeeAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                </td>
+                                <td className="px-3 py-2">
+                                  {emp.ledgerEntries && emp.ledgerEntries.length > 0 ? (
+                                    <div className="space-y-1">
+                                      {emp.ledgerEntries.map((le, li) => (
+                                        <div key={li} className="text-xs text-gray-600">
+                                          {le.ledgerCode} — {le.ledgerName}: ₹{(le.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : <span className="text-gray-400 text-xs">—</span>}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot className="bg-orange-100">
+                            <tr>
+                              <td colSpan={5} className="px-3 py-2 text-right font-semibold text-orange-800 text-sm">Total:</td>
+                              <td className="px-3 py-2 text-right font-bold text-green-700">
+                                ₹{viewingEmployeeRecord.employeeEntries.reduce((s, e) => s + (e.employeeAmount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                              </td>
+                              <td />
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
                   )}
                 </>
               )}
@@ -942,82 +1015,23 @@ const AdvanceDeposits = ({
                 </div>
               )}
 
-              {/* EJV - Entry Journal Voucher (Employee Details with Multiple Option) */}
+              {/* EJV - Entry Journal Voucher (Employee Details) */}
               {formData.voucherType === 'EJV' && (
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between bg-orange-50 border border-orange-200 rounded-lg p-4">
+                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
                     <h3 className="text-lg font-semibold text-slate-700 flex items-center">
-                      <User className="h-5 w-5 mr-2 text-orange-500" />
-                      Employee Details - Entry Journal Voucher (EJV)
+                      <Users className="h-5 w-5 mr-2 text-orange-500" />
+                      Employee Details — Entry Journal Voucher (EJV)
                     </h3>
-                    
-                    <div className="flex items-center space-x-4">
-                      <span className="text-sm font-medium text-slate-600">Add Employee Details?</span>
-                      <div className="flex items-center space-x-2">
-                        <label className="flex items-center space-x-1">
-                          <input
-                            type="radio"
-                            name="showEmployeeDetails"
-                            value="no"
-                            checked={!showEmployeeDetails}
-                            onChange={() => {
-                              setShowEmployeeDetails(false);
-                              setShowMultipleEmployees(false);
-                              setEmployeeEntries([]);
-                            }}
-                            className="text-blue-600 focus:ring-blue-500"
-                          />
-                          <span className="text-sm">No</span>
-                        </label>
-                        <label className="flex items-center space-x-1">
-                          <input
-                            type="radio"
-                            name="showEmployeeDetails"
-                            value="yes"
-                            checked={showEmployeeDetails}
-                            onChange={() => {setShowEmployeeDetails(true)
-                               setShowMultipleEmployees(true); }
-                            }
-                            className="text-green-600 focus:ring-green-500"
-                          />
-                          <span className="text-sm">Yes</span>
-                        </label>
-                      </div>
-                    </div>
+                    <p className="text-sm text-slate-500 mt-1">Add one or more employees with their amounts and optional ledger breakdown.</p>
                   </div>
-
-                  {showEmployeeDetails && (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg p-4">
-                        <span className="text-sm font-medium text-slate-600">Multiple Employees?</span>
-                        <div className="flex items-center space-x-2">
-                          <label className="flex items-center space-x-1">
-                            <input
-                              type="radio"
-                              name="multipleEmployees"
-                              value="yes"
-                              checked={showMultipleEmployees}
-                              onChange={() => setShowMultipleEmployees(true)}
-                              className="text-green-600 focus:ring-green-500"
-                            />
-                            <span className="text-sm">Multiple Employees</span>
-                          </label>
-                        </div>
-                      </div>
-
-                      {/* Multiple Employees Entry Interface */}
-                      {showMultipleEmployees && (
-                        <MultipleEmployeeEntry
-                          formData={formData}
-                          onChange={handleChange}
-                          showToast={showToast}
-                          showConfirmDialog={mockShowConfirmDialog}
-                          onEmployeeEntriesChange={handleEmployeeEntriesChange}
-                          initialEmployeeEntries={employeeEntries}
-                        />
-                      )}
-                    </div>
-                  )}
+                  <EmployeeSelector
+                    onEmployeeEntriesChange={handleEmployeeEntriesChange}
+                    initialEmployeeEntries={employeeEntries}
+                    showToast={showToast}
+                    showConfirmDialog={async (title, message) => window.confirm(`${title}\n\n${message}`)}
+                    ledgers={[]}
+                  />
                 </div>
               )}
 

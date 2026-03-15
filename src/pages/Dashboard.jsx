@@ -146,7 +146,7 @@ const Dashboard = () => {
                 <span className="text-blue-600 font-medium">→</span>
               </Link>
 
-              <Link to="/admin/users" className="flex items-center justify-between p-4 bg-green-50 rounded-lg hover:bg-green-100 transition-colors">
+              <Link to="/admin/allocation" className="flex items-center justify-between p-4 bg-green-50 rounded-lg hover:bg-green-100 transition-colors">
                 <div className="flex items-center space-x-3">
                   <Settings className="h-6 w-6 text-green-600" />
                   <div>

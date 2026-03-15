@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BookOpen, Users, DollarSign, Building, CreditCard, Eye, Search, Edit, Trash2, Plus, Save, FileText, MapPin, Wallet } from 'lucide-react';
 import { FormField } from "../../components/common/FormField";
 import SearchableDropdown from "../../components/common/SearchableDropdown";
-import { ledgerService, institutionService, fundService } from "../../services/realServices";
+import { ledgerService, institutionService, fundService, groupService } from "../../services/realServices";
 import { useApiService } from "../../hooks/useApiService";
 import { ErrorDisplay } from '../../components/common/ErrorDisplay';
 import { ConfirmDialog, useConfirmDialog } from "../../components/common/Popup";
@@ -29,7 +29,8 @@ const MasterLedgerCreation = () => {
   const [errors, setErrors] = useState({});
   const [ledgers, setLedgers] = useState([]);
   const [institutions, setInstitutions] = useState([]);
-  const [funds, setFunds] = useState([]); // New state for funds
+  const [funds, setFunds] = useState([]);
+  const [groups, setGroups] = useState([]);
   const [showTable, setShowTable] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -38,24 +39,12 @@ const MasterLedgerCreation = () => {
 
   const { executeApi, loading, error, clearError } = useApiService();
 
-  // Convert group options to SearchableDropdown format
-  const groupOptions = [
-    { value: 'Bank Account', label: 'Bank Account', description: 'Bank accounts for cash transactions' },
-    // { value: 'Cash', label: 'Cash', description: 'Cash in hand accounts' },
-    // { value: 'Current Assets', label: 'Current Assets', description: 'Short-term assets convertible to cash' },
-    // { value: 'Current Liabilities', label: 'Current Liabilities', description: 'Short-term debts and obligations' },
-    // { value: 'Fixed Assets', label: 'Fixed Assets', description: 'Long-term tangible assets' },
-    // { value: 'Income', label: 'Income', description: 'General income accounts' },
-    // { value: 'Direct Income', label: 'Direct Income', description: 'Revenue directly from business operations' },
-    // { value: 'Indirect Income', label: 'Indirect Income', description: 'Revenue from secondary sources' },
-    // { value: 'Expenditure', label: 'Expenditure', description: 'General expense accounts' },
-    // { value: 'Direct Expenses', label: 'Direct Expenses', description: 'Costs directly related to operations' },
-    // { value: 'Indirect Expenses', label: 'Indirect Expenses', description: 'Overhead and administrative costs' },
-    // { value: 'Loans & Advances', label: 'Loans & Advances', description: 'Money lent or advanced to others' },
-    // { value: 'Deposits', label: 'Deposits', description: 'Security deposits and advance payments' },
-    // { value: 'Sundry Debtors', label: 'Sundry Debtors', description: 'Customers who owe money' },
-    // { value: 'Sundry Creditors', label: 'Sundry Creditors', description: 'Suppliers to whom money is owed' }
-  ];
+  // Convert group options to SearchableDropdown format (loaded dynamically from API)
+  const groupOptions = groups.map(g => ({
+    value: g.groupName,
+    label: g.groupName,
+    description: g.underMainGroup ? `Main Group: ${g.underMainGroup}` : (g.description || ''),
+  }));
 
   // Local body type options
   const localBodyTypeOptions = [
@@ -72,6 +61,7 @@ const MasterLedgerCreation = () => {
     loadLedgers();
     loadInstitutions();
     loadFunds();
+    loadGroups();
   }, []);
 
   const loadLedgers = async () => {
@@ -92,6 +82,13 @@ const MasterLedgerCreation = () => {
     const result = await executeApi(fundService.getAll);
     if (result.success) {
       setFunds(result.data || []);
+    }
+  };
+
+  const loadGroups = async () => {
+    const result = await executeApi(groupService.getAll);
+    if (result.success) {
+      setGroups(result.data || []);
     }
   };
 

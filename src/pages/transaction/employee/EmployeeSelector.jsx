@@ -446,39 +446,41 @@ const EmployeeSelector = ({
             />
           </div>
 
-          {/* Ledger Details Toggle */}
-          <div className="md:col-span-2">
-            <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg p-4">
-              <span className="text-sm font-medium text-gray-600">Add Ledger Breakdown?</span>
-              <div className="flex items-center space-x-2">
-                <label className="flex items-center space-x-1">
-                  <input
-                    type="radio"
-                    name="showLedgerDetails"
-                    value="no"
-                    checked={!showLedgerDetails}
-                    onChange={() => {
-                      setShowLedgerDetails(false);
-                      setCurrentEntry(prev => ({ ...prev, ledgerEntries: [] }));
-                    }}
-                    className="text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-sm">No</span>
-                </label>
-                <label className="flex items-center space-x-1">
-                  <input
-                    type="radio"
-                    name="showLedgerDetails"
-                    value="yes"
-                    checked={showLedgerDetails}
-                    onChange={() => setShowLedgerDetails(true)}
-                    className="text-green-600 focus:ring-green-500"
-                  />
-                  <span className="text-sm">Yes</span>
-                </label>
+          {/* Ledger Breakdown — only shown when ledgers are configured */}
+          {ledgers.length > 0 && (
+            <>
+            <div className="md:col-span-2">
+              <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <span className="text-sm font-medium text-gray-600">Add Ledger Breakdown?</span>
+                <div className="flex items-center space-x-2">
+                  <label className="flex items-center space-x-1">
+                    <input
+                      type="radio"
+                      name="showLedgerDetails"
+                      value="no"
+                      checked={!showLedgerDetails}
+                      onChange={() => {
+                        setShowLedgerDetails(false);
+                        setCurrentEntry(prev => ({ ...prev, ledgerEntries: [] }));
+                      }}
+                      className="text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-sm">No</span>
+                  </label>
+                  <label className="flex items-center space-x-1">
+                    <input
+                      type="radio"
+                      name="showLedgerDetails"
+                      value="yes"
+                      checked={showLedgerDetails}
+                      onChange={() => setShowLedgerDetails(true)}
+                      className="text-green-600 focus:ring-green-500"
+                    />
+                    <span className="text-sm">Yes</span>
+                  </label>
+                </div>
               </div>
             </div>
-          </div>
 
           {/* Ledger Entry Section */}
           {showLedgerDetails && (
@@ -597,6 +599,8 @@ const EmployeeSelector = ({
                   </div>
                 </div>
               )}
+            </>
+          )}
             </>
           )}
 
