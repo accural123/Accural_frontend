@@ -6,6 +6,7 @@ import { useToast } from '../../hooks/useToast';
 import { ToastContainer } from '../../components/common/ToastContainer';
 import { KeyRound, Shield, UserX, UserCheck, Trash2, Edit, RefreshCw } from 'lucide-react';
 import SearchableRecords from '../../components/common/SearchableRecords';
+import Pagination from '../../components/common/Pagination';
 const Admin = () => {
   const { dialogState, showConfirmDialog, closeDialog } = useConfirmDialog();
   const { toasts, showToast, removeToast } = useToast();
@@ -22,6 +23,8 @@ const Admin = () => {
     role: '',
     userStatus: '',
   });
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 20;
   const [formData, setFormData] = useState({
     name: '',
     username: '',
@@ -304,11 +307,14 @@ const Admin = () => {
     );
   };
 
+  const selectedIds = new Set(selectedUsers);
+
   const handleSelectAllUsers = () => {
-    if (selectedUsers.length === users.length) {
-      setSelectedUsers([]);
+    const allSelected = paginatedUsers.every(u => selectedIds.has(u.id));
+    if (allSelected) {
+      setSelectedUsers(prev => prev.filter(id => !paginatedUsers.map(u => u.id).includes(id)));
     } else {
-      setSelectedUsers(users.map(user => user.id));
+      setSelectedUsers(prev => [...new Set([...prev, ...paginatedUsers.map(u => u.id)])]);
     }
   };
 
@@ -322,6 +328,9 @@ const Admin = () => {
     const statusMatch = !f.userStatus || user.status === f.userStatus;
     return searchMatch && roleMatch && statusMatch;
   });
+
+  const totalPages = Math.ceil(filteredUsers.length / PAGE_SIZE);
+  const paginatedUsers = filteredUsers.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   if (loading) {
     return (
@@ -384,7 +393,7 @@ const Admin = () => {
           title="System Users"
           totalRecords={filteredUsers.length}
           searchFilters={searchFilters}
-          onFiltersChange={setSearchFilters}
+          onFiltersChange={(filters) => { setSearchFilters(filters); setCurrentPage(1); }}
           loading={false}
           gradientFrom="from-blue-600"
           gradientTo="to-indigo-600"
@@ -422,7 +431,7 @@ const Admin = () => {
                   <th className="px-6 py-3 text-left">
                     <input
                       type="checkbox"
-                      checked={selectedUsers.length === filteredUsers.length && filteredUsers.length > 0}
+                      checked={paginatedUsers.length > 0 && paginatedUsers.every(u => selectedIds.has(u.id))}
                       onChange={handleSelectAllUsers}
                       className="rounded"
                     />
@@ -434,7 +443,7 @@ const Admin = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {filteredUsers.map((user) => (
+                {paginatedUsers.map((user) => (
                   <tr key={user.id} className={selectedUsers.includes(user.id) ? 'bg-blue-50' : ''}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <input
@@ -510,6 +519,11 @@ const Admin = () => {
               <div className="text-center py-8 text-gray-500">No users found matching your filters.</div>
             )}
           </div>
+          {totalPages > 1 && (
+            <div className="px-6 py-4 border-t border-slate-200">
+              <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} pageSize={PAGE_SIZE} totalItems={filteredUsers.length} />
+            </div>
+          )}
         </SearchableRecords>
       </div>
 <ConfirmDialog

@@ -590,6 +590,7 @@ import { ledgerService, groupService } from "../../services/realServices"; // Ad
 import { useApiService } from "../../hooks/useApiService";
 import { ErrorDisplay } from '../../components/common/ErrorDisplay';
 import { ConfirmDialog, useConfirmDialog } from "../../components/common/Popup";
+import Pagination from "../../components/common/Pagination";
 import { useAuth } from '../../context/AuthContext';
 const LedgerCreation = () => {
   const { dialogState, showConfirmDialog, closeDialog } = useConfirmDialog();
@@ -618,6 +619,8 @@ const LedgerCreation = () => {
   const [showBankDetails, setShowBankDetails] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 20;
 
   const { executeApi, loading, error, clearError } = useApiService();
 
@@ -958,11 +961,14 @@ const handleDelete = async (id) => {
     ledger.bankName?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const totalPages = Math.ceil(filteredLedgers.length / PAGE_SIZE);
+  const paginatedLedgers = filteredLedgers.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
   const handleSelectAll = () => {
-    if (filteredLedgers.every(l => selectedIds.has(l.id))) {
+    if (paginatedLedgers.every(l => selectedIds.has(l.id))) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(filteredLedgers.map(l => l.id)));
+      setSelectedIds(new Set(paginatedLedgers.map(l => l.id)));
     }
   };
 
@@ -1249,7 +1255,7 @@ const handleDelete = async (id) => {
                   type="text"
                   placeholder="Search ledgers..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                   className="pl-10 pr-4 py-2 bg-white/20 backdrop-blur-sm border border-white/30 rounded-lg text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/50"
                 />
               </div>
@@ -1286,7 +1292,7 @@ const handleDelete = async (id) => {
                   <th className="px-4 py-3 w-10">
                     <input
                       type="checkbox"
-                      checked={filteredLedgers.length > 0 && filteredLedgers.every(l => selectedIds.has(l.id))}
+                      checked={paginatedLedgers.length > 0 && paginatedLedgers.every(l => selectedIds.has(l.id))}
                       onChange={handleSelectAll}
                       className="rounded"
                     />
@@ -1301,7 +1307,7 @@ const handleDelete = async (id) => {
                 </tr>
               </thead>
               <tbody className="bg-white/40 divide-y divide-slate-200">
-                {filteredLedgers.map((ledger) => (
+                {paginatedLedgers.map((ledger) => (
                   <tr key={ledger.id} className={`hover:bg-white/60 transition-colors ${selectedIds.has(ledger.id) ? 'bg-blue-50' : ''}`}>
                     <td className="px-4 py-4">
                       <input
@@ -1364,7 +1370,19 @@ const handleDelete = async (id) => {
               </tbody>
             </table>
           </div>
-          
+
+          {totalPages > 1 && (
+            <div className="px-6 py-4 border-t border-slate-200">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                pageSize={PAGE_SIZE}
+                totalItems={filteredLedgers.length}
+              />
+            </div>
+          )}
+
           {filteredLedgers.length === 0 && (
             <div className="text-center py-8">
               <BookOpen className="h-12 w-12 text-slate-400 mx-auto mb-4" />

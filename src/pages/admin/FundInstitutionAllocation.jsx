@@ -8,6 +8,7 @@ import { ErrorDisplay } from '../../components/common/ErrorDisplay';
 import SearchableDropdown from '../../components/common/SearchableDropdown';// Import your dropdown component
 import { ConfirmDialog, useConfirmDialog } from "../../components/common/Popup";
 import SearchableRecords from '../../components/common/SearchableRecords';
+import Pagination from '../../components/common/Pagination';
 const FundInstitutionAllocation = () => {
   const { dialogState, showConfirmDialog, closeDialog } = useConfirmDialog();
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -21,6 +22,8 @@ const FundInstitutionAllocation = () => {
   const [searchFilters, setSearchFilters] = useState({ searchTerm: '', status: '', user: '', dateFrom: '', dateTo: '' });
   const [filterUser, setFilterUser] = useState('');
   const [submitLoading, setSubmitLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 20;
   const { executeApi, loading: apiLoading, error, clearError } = useApiService();
   
   const [allocationForm, setAllocationForm] = useState({
@@ -304,11 +307,14 @@ const FundInstitutionAllocation = () => {
     return matchesSearch && matchesUserFilter && matchesStatus && matchesDateFrom && matchesDateTo;
   });
 
+  const totalPages = Math.ceil(filteredAllocations.length / PAGE_SIZE);
+  const paginatedAllocations = filteredAllocations.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
   const handleSelectAll = () => {
-    if (filteredAllocations.every(item => selectedIds.has(item.id))) {
+    if (paginatedAllocations.every(item => selectedIds.has(item.id))) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(filteredAllocations.map(item => item.id)));
+      setSelectedIds(new Set(paginatedAllocations.map(item => item.id)));
     }
   };
 
@@ -596,7 +602,7 @@ const FundInstitutionAllocation = () => {
         title="User Allocations"
         totalRecords={filteredAllocations.length}
         searchFilters={searchFilters}
-        onFiltersChange={(f) => { setSearchFilters(f); }}
+        onFiltersChange={(f) => { setSearchFilters(f); setCurrentPage(1); }}
         loading={loading}
         gradientFrom="from-blue-500"
         gradientTo="to-purple-500"
@@ -656,7 +662,7 @@ const FundInstitutionAllocation = () => {
                 <th className="px-4 py-3 w-10">
                   <input
                     type="checkbox"
-                    checked={filteredAllocations.length > 0 && filteredAllocations.every(item => selectedIds.has(item.id))}
+                    checked={paginatedAllocations.length > 0 && paginatedAllocations.every(item => selectedIds.has(item.id))}
                     onChange={handleSelectAll}
                     className="rounded"
                   />
@@ -671,7 +677,7 @@ const FundInstitutionAllocation = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredAllocations.map((allocation) => {
+              {paginatedAllocations.map((allocation) => {
                 const user = users.find(u =>
                   String(u.id) === String(allocation.id) ||
                   String(u.id) === String(allocation.userId)
@@ -779,6 +785,11 @@ const FundInstitutionAllocation = () => {
             </div>
           )}
         </div>
+        {totalPages > 1 && (
+          <div className="px-6 py-4 border-t border-slate-200">
+            <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} pageSize={PAGE_SIZE} totalItems={filteredAllocations.length} />
+          </div>
+        )}
       </SearchableRecords>
 <ConfirmDialog
   isOpen={dialogState.isOpen}

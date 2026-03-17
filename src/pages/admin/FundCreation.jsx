@@ -4,6 +4,7 @@ import { fundService } from "../../services/realServices"; // Change this import
 import { useApiService } from "../../hooks/useApiService";
 import { ConfirmDialog, useConfirmDialog } from "../../components/common/Popup";
 import SearchableRecords from '../../components/common/SearchableRecords';
+import Pagination from '../../components/common/Pagination';
 const FundCreation = () => {
   const { dialogState, showConfirmDialog, closeDialog } = useConfirmDialog();
   const [formData, setFormData] = useState({
@@ -17,6 +18,8 @@ const FundCreation = () => {
   const [searchFilters, setSearchFilters] = useState({ searchTerm: '', dateFrom: '', dateTo: '' });
   const [submitLoading, setSubmitLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 20;
   const { executeApi, loading, error, clearError } = useApiService();
 
   // Load funds from localStorage on component mount
@@ -210,11 +213,14 @@ const handleDelete = async (id) => {
     return searchMatch && dateFromMatch && dateToMatch;
   });
 
+  const totalPages = Math.ceil(filteredFunds.length / PAGE_SIZE);
+  const paginatedFunds = filteredFunds.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
   const handleSelectAll = () => {
-    if (filteredFunds.every(item => selectedIds.has(item.id))) {
+    if (paginatedFunds.every(item => selectedIds.has(item.id))) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(filteredFunds.map(item => item.id)));
+      setSelectedIds(new Set(paginatedFunds.map(item => item.id)));
     }
   };
 
@@ -353,7 +359,7 @@ const handleDelete = async (id) => {
           title="All Funds"
           totalRecords={filteredFunds.length}
           searchFilters={searchFilters}
-          onFiltersChange={setSearchFilters}
+          onFiltersChange={(filters) => { setSearchFilters(filters); setCurrentPage(1); }}
           loading={false}
           gradientFrom="from-green-500"
           gradientTo="to-emerald-500"
@@ -389,7 +395,7 @@ const handleDelete = async (id) => {
                   <th className="px-4 py-3 w-10">
                     <input
                       type="checkbox"
-                      checked={filteredFunds.length > 0 && filteredFunds.every(item => selectedIds.has(item.id))}
+                      checked={paginatedFunds.length > 0 && paginatedFunds.every(item => selectedIds.has(item.id))}
                       onChange={handleSelectAll}
                       className="rounded"
                     />
@@ -400,7 +406,7 @@ const handleDelete = async (id) => {
                 </tr>
               </thead>
               <tbody className="bg-white/40 divide-y divide-slate-200">
-                {filteredFunds.map((fund) => (
+                {paginatedFunds.map((fund) => (
                   <tr key={fund.id} className="hover:bg-white/60 transition-colors">
                     <td className="px-4 py-3">
                       <input
@@ -441,6 +447,11 @@ const handleDelete = async (id) => {
               </div>
             )}
           </div>
+          {totalPages > 1 && (
+            <div className="px-6 py-4 border-t border-slate-200">
+              <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} pageSize={PAGE_SIZE} totalItems={filteredFunds.length} />
+            </div>
+          )}
         </SearchableRecords>
       </div>
       <ConfirmDialog
