@@ -563,7 +563,7 @@
 //             <div className="text-center py-8">
 //               <BookOpen className="h-12 w-12 text-slate-400 mx-auto mb-4" />
 //               <p className="text-slate-500">
-//                 {searchTerm ? 'No ledgers found matching your search.' : 'No ledgers created yet.'}
+//                 {searchFilters.searchTerm ? 'No ledgers found matching your search.' : 'No ledgers created yet.'}
 //               </p>
 //               {!searchTerm && (
 //                 <button
@@ -591,6 +591,7 @@ import { useApiService } from "../../hooks/useApiService";
 import { ErrorDisplay } from '../../components/common/ErrorDisplay';
 import { ConfirmDialog, useConfirmDialog } from "../../components/common/Popup";
 import Pagination from "../../components/common/Pagination";
+import SearchableRecords from "../../components/common/SearchableRecords";
 import { useAuth } from '../../context/AuthContext';
 const LedgerCreation = () => {
   const { dialogState, showConfirmDialog, closeDialog } = useConfirmDialog();
@@ -615,7 +616,7 @@ const LedgerCreation = () => {
   const [groups, setGroups] = useState([]); // State for real groups
   const [showTable, setShowTable] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchFilters, setSearchFilters] = useState({ searchTerm: '', underGroup: '', localBodyType: '' });
   const [showBankDetails, setShowBankDetails] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -953,13 +954,19 @@ const handleDelete = async (id) => {
     }
   };
 
-  const filteredLedgers = ledgers.filter(ledger =>
-    ledger.ledgerCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    ledger.ledgerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    ledger.underGroup?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    ledger.localBodyType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    ledger.bankName?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredLedgers = ledgers.filter(ledger => {
+    const f = searchFilters;
+    const searchMatch = !f.searchTerm ||
+      ledger.ledgerCode?.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
+      ledger.ledgerName?.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
+      ledger.underGroup?.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
+      ledger.localBodyType?.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
+      ledger.bankName?.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
+      ledger.accountNo?.toLowerCase().includes(f.searchTerm.toLowerCase());
+    const underGroupMatch = !f.underGroup || ledger.underGroup?.toLowerCase().includes(f.underGroup.toLowerCase());
+    const localBodyMatch = !f.localBodyType || ledger.localBodyType === f.localBodyType;
+    return searchMatch && underGroupMatch && localBodyMatch;
+  });
 
   const totalPages = Math.ceil(filteredLedgers.length / PAGE_SIZE);
   const paginatedLedgers = filteredLedgers.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
@@ -1245,23 +1252,24 @@ const handleDelete = async (id) => {
 
       {/* Ledgers List */}
       {showTable && (
-        <div className="bg-white/60 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200/60 overflow-hidden">
-          <div className="bg-gradient-to-r from-green-500 to-emerald-500 px-6 py-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-white">Ledger Accounts ({ledgers.length})</h2>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search ledgers..."
-                  value={searchTerm}
-                  onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-                  className="pl-10 pr-4 py-2 bg-white/20 backdrop-blur-sm border border-white/30 rounded-lg text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/50"
-                />
-              </div>
-            </div>
-          </div>
-          
+        <SearchableRecords
+          title={`Ledger Accounts (${ledgers.length})`}
+          filters={searchFilters}
+          onFiltersChange={(f) => { setSearchFilters(f); setCurrentPage(1); }}
+          searchPlaceholder="Search by code, name, group, bank..."
+          filterConfig={{ dateRange: false, amountRange: false, fromWhom: false, fundType: false, status: false, transactionMode: false }}
+          customFilters={[
+            { key: 'underGroup', label: 'Under Group', type: 'text', placeholder: 'Filter by group...' },
+            { key: 'localBodyType', label: 'Local Body Type', type: 'select', options: [
+              { value: '', label: 'All Types' },
+              { value: 'Municipality', label: 'Municipality' },
+              { value: 'Town Panchayat', label: 'Town Panchayat' },
+              { value: 'Village Panchayat', label: 'Village Panchayat' },
+              { value: 'Corporation', label: 'Corporation' },
+            ]},
+          ]}
+          totalItems={filteredLedgers.length}
+        >
           {selectedIds.size > 0 && (
             <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded-lg px-4 py-3 mx-4 mt-4">
               <span className="text-sm font-medium text-red-700">
@@ -1387,9 +1395,9 @@ const handleDelete = async (id) => {
             <div className="text-center py-8">
               <BookOpen className="h-12 w-12 text-slate-400 mx-auto mb-4" />
               <p className="text-slate-500">
-                {searchTerm ? 'No ledgers found matching your search.' : 'No ledgers created yet.'}
+                {searchFilters.searchTerm ? 'No ledgers found matching your search.' : 'No ledgers created yet.'}
               </p>
-              {!searchTerm && (
+              {!searchFilters.searchTerm && (
                 <button
                   onClick={() => setShowTable(false)}
                   className="text-blue-600 hover:text-blue-800 text-sm font-medium mt-2"
@@ -1399,7 +1407,7 @@ const handleDelete = async (id) => {
               )}
             </div>
           )}
-        </div>
+        </SearchableRecords>
       )}
       <ConfirmDialog
   isOpen={dialogState.isOpen}
