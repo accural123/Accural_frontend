@@ -75,15 +75,17 @@ const BankReceiptCorrection = () => {
     }
   };
 
+  const normalizeStr = (str) => str?.replace(/\u00A0/g, ' ') || '';
   const filteredVouchers = bankReceiptVouchers.filter(voucher => {
     const { searchTerm, dateFrom, dateTo, amountMin, amountMax, fromWhom, fundType, status } = searchFilters;
-    const matchesSearch = !searchTerm ||
-      voucher.brvNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      voucher.fromWhom?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      voucher.fundType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      voucher.brvDate?.includes(searchTerm);
-    const matchesFromWhom = !fromWhom || voucher.fromWhom?.toLowerCase().includes(fromWhom.toLowerCase());
-    const matchesFundType = !fundType || voucher.fundType?.toLowerCase().includes(fundType.toLowerCase());
+    const s = normalizeStr(searchTerm).toLowerCase();
+    const matchesSearch = !s ||
+      normalizeStr(voucher.brvNo).toLowerCase().includes(s) ||
+      normalizeStr(voucher.fromWhom).toLowerCase().includes(s) ||
+      normalizeStr(voucher.fundType).toLowerCase().includes(s) ||
+      normalizeStr(voucher.brvDate).includes(s);
+    const matchesFromWhom = !fromWhom || normalizeStr(voucher.fromWhom).toLowerCase().includes(normalizeStr(fromWhom).toLowerCase());
+    const matchesFundType = !fundType || normalizeStr(voucher.fundType).toLowerCase().includes(normalizeStr(fundType).toLowerCase());
     const matchesStatus = !status || (status === 'balanced' ? voucher.balanced : !voucher.balanced);
     const matchesDateFrom = !dateFrom || (voucher.brvDate && voucher.brvDate >= dateFrom);
     const matchesDateTo = !dateTo || (voucher.brvDate && voucher.brvDate <= dateTo);

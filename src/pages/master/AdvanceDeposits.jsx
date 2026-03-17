@@ -540,15 +540,17 @@ const AdvanceDeposits = ({
     }
   };
 
+  const normalizeStr = (str) => str?.replace(/\u00A0/g, ' ') || '';
   const filteredRecords = savedRecords.filter(record => {
     const { searchTerm, transactionType, voucherType } = searchFilters;
-    const matchesSearch = !searchTerm ||
-      record.nameDesignation?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.voucherNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.ledgerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.transactionType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.voucherType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.referenceNumber?.toLowerCase().includes(searchTerm.toLowerCase());
+    const s = normalizeStr(searchTerm).toLowerCase();
+    const matchesSearch = !s ||
+      normalizeStr(record.nameDesignation).toLowerCase().includes(s) ||
+      normalizeStr(record.voucherNo).toLowerCase().includes(s) ||
+      normalizeStr(record.ledgerName).toLowerCase().includes(s) ||
+      normalizeStr(record.transactionType).toLowerCase().includes(s) ||
+      normalizeStr(record.voucherType).toLowerCase().includes(s) ||
+      normalizeStr(record.referenceNumber).toLowerCase().includes(s);
     const matchesTransactionType = !transactionType || record.transactionType === transactionType;
     const matchesVoucherType = !voucherType || record.voucherType === voucherType;
     return matchesSearch && matchesTransactionType && matchesVoucherType;

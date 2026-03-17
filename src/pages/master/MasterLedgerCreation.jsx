@@ -7,6 +7,7 @@ import { ledgerService, institutionService, fundService, groupService } from "..
 import { useApiService } from "../../hooks/useApiService";
 import { ErrorDisplay } from '../../components/common/ErrorDisplay';
 import { ConfirmDialog, useConfirmDialog } from "../../components/common/Popup";
+import Pagination from '../../components/common/Pagination';
 import { useAuth } from '../../context/AuthContext';
 const MasterLedgerCreation = () => {
   const { dialogState, showConfirmDialog, closeDialog } = useConfirmDialog();
@@ -38,6 +39,8 @@ const MasterLedgerCreation = () => {
   const [showBankDetails, setShowBankDetails] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 20;
 
   const { executeApi, loading, error, clearError } = useApiService();
 
@@ -348,10 +351,10 @@ const handleDelete = async (id) => {
   };
 
   const handleSelectAll = () => {
-    if (filteredLedgers.every(item => selectedIds.has(item.id))) {
+    if (paginatedLedgers.every(item => selectedIds.has(item.id))) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(filteredLedgers.map(item => item.id)));
+      setSelectedIds(new Set(paginatedLedgers.map(item => item.id)));
     }
   };
 
@@ -381,17 +384,22 @@ const handleDelete = async (id) => {
     }
   };
 
+  const normalizeStr = (str) => str?.replace(/\u00A0/g, ' ') || '';
   const filteredLedgers = ledgers.filter(ledger => {
     const f = searchFilters;
-    const searchMatch = !f.searchTerm ||
-      ledger.ledgerCode?.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
-      ledger.ledgerName?.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
-      ledger.underGroup?.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
-      ledger.bankName?.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
-      getInstitutionName(ledger.institutionId)?.toLowerCase().includes(f.searchTerm.toLowerCase());
+    const s = normalizeStr(f.searchTerm).toLowerCase();
+    const searchMatch = !s ||
+      normalizeStr(ledger.ledgerCode).toLowerCase().includes(s) ||
+      normalizeStr(ledger.ledgerName).toLowerCase().includes(s) ||
+      normalizeStr(ledger.underGroup).toLowerCase().includes(s) ||
+      normalizeStr(ledger.bankName).toLowerCase().includes(s) ||
+      normalizeStr(getInstitutionName(ledger.institutionId)).toLowerCase().includes(s);
     const underGroupMatch = !f.underGroup || ledger.underGroup?.toLowerCase().includes(f.underGroup.toLowerCase());
     return searchMatch && underGroupMatch;
   });
+
+  const totalPages = Math.ceil(filteredLedgers.length / PAGE_SIZE);
+  const paginatedLedgers = filteredLedgers.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   return (
     <div className="space-y-6">
@@ -651,7 +659,7 @@ const handleDelete = async (id) => {
           title="Ledger Accounts"
           totalRecords={filteredLedgers.length}
           searchFilters={searchFilters}
-          onFiltersChange={setSearchFilters}
+          onFiltersChange={(f) => { setSearchFilters(f); setCurrentPage(1); }}
           loading={loading}
           gradientFrom="from-green-500"
           gradientTo="to-emerald-500"
@@ -690,7 +698,7 @@ const handleDelete = async (id) => {
                   <th className="px-4 py-3 w-10">
                     <input
                       type="checkbox"
-                      checked={filteredLedgers.length > 0 && filteredLedgers.every(item => selectedIds.has(item.id))}
+                      checked={paginatedLedgers.length > 0 && paginatedLedgers.every(item => selectedIds.has(item.id))}
                       onChange={handleSelectAll}
                       className="rounded"
                     />
@@ -706,7 +714,7 @@ const handleDelete = async (id) => {
                 </tr>
               </thead>
               <tbody className="bg-white/40 divide-y divide-slate-200">
-                {filteredLedgers.map((ledger) => (
+                {paginatedLedgers.map((ledger) => (
                   <tr key={ledger.id} className="hover:bg-white/60 transition-colors">
                     <td className="px-4 py-3">
                       <input
@@ -776,6 +784,11 @@ const handleDelete = async (id) => {
               </div>
             )}
           </div>
+          {totalPages > 1 && (
+            <div className="px-6 py-4 border-t border-slate-200">
+              <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} pageSize={PAGE_SIZE} totalItems={filteredLedgers.length} />
+            </div>
+          )}
         </SearchableRecords>
       )}
       <ConfirmDialog

@@ -318,12 +318,14 @@ const Admin = () => {
     }
   };
 
+  const normalizeStr = (str) => str?.replace(/\u00A0/g, ' ') || '';
   const filteredUsers = users.filter(user => {
     const f = searchFilters;
-    const searchMatch = !f.searchTerm ||
-      user.name?.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
-      user.username?.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
-      user.email?.toLowerCase().includes(f.searchTerm.toLowerCase());
+    const s = normalizeStr(f.searchTerm).toLowerCase();
+    const searchMatch = !s ||
+      normalizeStr(user.name).toLowerCase().includes(s) ||
+      normalizeStr(user.username).toLowerCase().includes(s) ||
+      normalizeStr(user.email).toLowerCase().includes(s);
     const roleMatch = !f.role || user.role === f.role;
     const statusMatch = !f.userStatus || user.status === f.userStatus;
     return searchMatch && roleMatch && statusMatch;

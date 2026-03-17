@@ -323,17 +323,19 @@ const PreviousReconciliation = () => {
     }
   };
 
+  const normalizeStr = (str) => str?.replace(/\u00A0/g, ' ') || '';
   const filteredReconciliations = savedReconciliations.filter(reconciliation => {
     const { searchTerm, transactionType, voucherType } = searchFilters;
-    const matchesSearch = !searchTerm ||
-      reconciliation.fundType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      reconciliation.month?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      reconciliation.bankCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      reconciliation.voucherType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      reconciliation.voucherNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      reconciliation.transactionType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      reconciliation.chequeNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      reconciliation.description?.toLowerCase().includes(searchTerm.toLowerCase());
+    const s = normalizeStr(searchTerm).toLowerCase();
+    const matchesSearch = !s ||
+      normalizeStr(reconciliation.fundType).toLowerCase().includes(s) ||
+      normalizeStr(reconciliation.month).toLowerCase().includes(s) ||
+      normalizeStr(reconciliation.bankCode).toLowerCase().includes(s) ||
+      normalizeStr(reconciliation.voucherType).toLowerCase().includes(s) ||
+      normalizeStr(reconciliation.voucherNo).toLowerCase().includes(s) ||
+      normalizeStr(reconciliation.transactionType).toLowerCase().includes(s) ||
+      normalizeStr(reconciliation.chequeNo).toLowerCase().includes(s) ||
+      normalizeStr(reconciliation.description).toLowerCase().includes(s);
     const matchesTransactionType = !transactionType || reconciliation.transactionType === transactionType;
     const matchesVoucherType = !voucherType || reconciliation.voucherType === voucherType;
     return matchesSearch && matchesTransactionType && matchesVoucherType;

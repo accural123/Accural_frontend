@@ -250,12 +250,14 @@ const VoucherTypeCreation = () => {
 
   
 
+  const normalizeStr = (str) => str?.replace(/\u00A0/g, ' ') || '';
   const filteredVoucherTypes = voucherTypes.filter(vt => {
     const { searchTerm, voucherType } = searchFilters;
-    const matchesSearch = !searchTerm ||
-      vt.voucherName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      vt.alias?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      vt.selectTypeOfVoucher?.toLowerCase().includes(searchTerm.toLowerCase());
+    const s = normalizeStr(searchTerm).toLowerCase();
+    const matchesSearch = !s ||
+      normalizeStr(vt.voucherName).toLowerCase().includes(s) ||
+      normalizeStr(vt.alias).toLowerCase().includes(s) ||
+      normalizeStr(vt.selectTypeOfVoucher).toLowerCase().includes(s);
     const matchesType = !voucherType || vt.selectTypeOfVoucher === voucherType;
     return matchesSearch && matchesType;
   });

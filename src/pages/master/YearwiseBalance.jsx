@@ -314,13 +314,15 @@ const handleDeleteRecord = async (id) => {
       : 0
   };
 
+  const normalizeStr = (str) => str?.replace(/\u00A0/g, ' ') || '';
   const filteredRecords = savedRecords.filter(record => {
     const { searchTerm, taxType } = searchFilters;
-    const matchesSearch = !searchTerm ||
-      record.fundType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.taxType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.year?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.financialYear?.toLowerCase().includes(searchTerm.toLowerCase());
+    const s = normalizeStr(searchTerm).toLowerCase();
+    const matchesSearch = !s ||
+      normalizeStr(record.fundType).toLowerCase().includes(s) ||
+      normalizeStr(record.taxType).toLowerCase().includes(s) ||
+      normalizeStr(record.year).toLowerCase().includes(s) ||
+      normalizeStr(record.financialYear).toLowerCase().includes(s);
     const matchesTaxType = !taxType || record.taxType === taxType;
     return matchesSearch && matchesTaxType;
   });

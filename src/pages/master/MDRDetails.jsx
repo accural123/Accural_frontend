@@ -432,14 +432,16 @@ const handleDelete = async (id) => {
     }, 3000);
   };
 
+  const normalizeStr = (str) => str?.replace(/\u00A0/g, ' ') || '';
   const filteredRecords = savedRecords.filter(record => {
     const { searchTerm, financialYear } = searchFilters;
-    const matchesSearch = !searchTerm ||
-      record.leaseNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.assessmentNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.lesseeName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.ledgerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.leasePropertyDetails?.toLowerCase().includes(searchTerm.toLowerCase());
+    const s = normalizeStr(searchTerm).toLowerCase();
+    const matchesSearch = !s ||
+      normalizeStr(record.leaseNo).toLowerCase().includes(s) ||
+      normalizeStr(record.assessmentNo).toLowerCase().includes(s) ||
+      normalizeStr(record.lesseeName).toLowerCase().includes(s) ||
+      normalizeStr(record.ledgerName).toLowerCase().includes(s) ||
+      normalizeStr(record.leasePropertyDetails).toLowerCase().includes(s);
     const matchesYear = !financialYear || record.financialYear === financialYear;
     return matchesSearch && matchesYear;
   });

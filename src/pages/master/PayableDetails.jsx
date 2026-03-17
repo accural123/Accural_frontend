@@ -599,16 +599,17 @@ const PayableDetails = () => {
     setCurrentPage(1);
   };
 
+  const normalizeStr = (str) => str?.replace(/\u00A0/g, ' ') || '';
   const filteredRecords = savedRecords.filter(record => {
     const filters = searchFilters;
-    
-    const searchMatch = !filters.searchTerm || 
-      record.voucherNo?.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
-      record.transactionType?.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
-      record.ledgerName?.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
-      record.description?.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
-      record.nameOfWork?.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
-      record.nameOfEmployee?.toLowerCase().includes(filters.searchTerm.toLowerCase());
+    const s = normalizeStr(filters.searchTerm).toLowerCase();
+    const searchMatch = !s ||
+      normalizeStr(record.voucherNo).toLowerCase().includes(s) ||
+      normalizeStr(record.transactionType).toLowerCase().includes(s) ||
+      normalizeStr(record.ledgerName).toLowerCase().includes(s) ||
+      normalizeStr(record.description).toLowerCase().includes(s) ||
+      normalizeStr(record.nameOfWork).toLowerCase().includes(s) ||
+      normalizeStr(record.nameOfEmployee).toLowerCase().includes(s);
 
     const dateFromMatch = !filters.dateFrom || record.voucherDate >= filters.dateFrom;
     const dateToMatch = !filters.dateTo || record.voucherDate <= filters.dateTo;

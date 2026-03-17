@@ -407,11 +407,13 @@ const deleteEntry = async (entry) => {
     { key: 'effectiveDate', title: 'Effective Date' }
   ];
 
+  const normalizeStr = (str) => str?.replace(/\u00A0/g, ' ') || '';
   const filteredConfigurations = savedConfigurations.filter(config => {
     const { searchTerm, gjvStatus } = searchFilters;
-    const matchesSearch = !searchTerm ||
-      config.gjvType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      config.description?.toLowerCase().includes(searchTerm.toLowerCase());
+    const s = normalizeStr(searchTerm).toLowerCase();
+    const matchesSearch = !s ||
+      normalizeStr(config.gjvType).toLowerCase().includes(s) ||
+      normalizeStr(config.description).toLowerCase().includes(s);
     const matchesStatus = !gjvStatus || config.status === gjvStatus;
     return matchesSearch && matchesStatus;
   });

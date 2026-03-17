@@ -87,16 +87,18 @@ const InterBankTransferCorrection = () => {
     return modes[modeOfTransaction] || { label: modeOfTransaction, color: 'bg-gray-100 text-gray-800', icon: 'FileText' };
   };
 
+  const normalizeStr = (str) => str?.replace(/\u00A0/g, ' ') || '';
   const filteredTransfers = interBankTransfers.filter(transfer => {
     const { searchTerm, modeOfTransaction, status, dateFrom, dateTo, amountMin, amountMax } = searchFilters;
-    const matchesSearch = !searchTerm ||
-      transfer.ibtNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      transfer.transferNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      transfer.modeOfTransaction?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      transfer.ibtDate?.includes(searchTerm) ||
-      transfer.chequeNoRefNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      transfer.narration?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesMode = !modeOfTransaction || transfer.modeOfTransaction?.toLowerCase().includes(modeOfTransaction.toLowerCase());
+    const s = normalizeStr(searchTerm).toLowerCase();
+    const matchesSearch = !s ||
+      normalizeStr(transfer.ibtNo).toLowerCase().includes(s) ||
+      normalizeStr(transfer.transferNumber).toLowerCase().includes(s) ||
+      normalizeStr(transfer.modeOfTransaction).toLowerCase().includes(s) ||
+      normalizeStr(transfer.ibtDate).includes(s) ||
+      normalizeStr(transfer.chequeNoRefNo).toLowerCase().includes(s) ||
+      normalizeStr(transfer.narration).toLowerCase().includes(s);
+    const matchesMode = !modeOfTransaction || normalizeStr(transfer.modeOfTransaction).toLowerCase().includes(normalizeStr(modeOfTransaction).toLowerCase());
     const matchesStatus = !status || (status === 'balanced' ? transfer.balanced : !transfer.balanced);
     const matchesDateFrom = !dateFrom || (transfer.ibtDate && transfer.ibtDate >= dateFrom);
     const matchesDateTo = !dateTo || (transfer.ibtDate && transfer.ibtDate <= dateTo);

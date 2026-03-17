@@ -369,12 +369,14 @@ const OpeningBalance = () => {
   const isBalanced = debitTotal === creditTotal;
   const difference = Math.abs(debitTotal - creditTotal);
 
+  const normalizeStr = (str) => str?.replace(/\u00A0/g, ' ') || '';
   const filteredSavedBalances = savedOpeningBalances.filter(balance => {
     const { searchTerm, balanceType } = searchFilters;
-    const matchesSearch = !searchTerm ||
-      balance.accountCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      balance.accountHead?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      balance.financialYear?.toLowerCase().includes(searchTerm.toLowerCase());
+    const s = normalizeStr(searchTerm).toLowerCase();
+    const matchesSearch = !s ||
+      normalizeStr(balance.accountCode).toLowerCase().includes(s) ||
+      normalizeStr(balance.accountHead).toLowerCase().includes(s) ||
+      normalizeStr(balance.financialYear).toLowerCase().includes(s);
     const matchesType = !balanceType || balance.type === balanceType;
     return matchesSearch && matchesType;
   });

@@ -87,16 +87,18 @@ const JournalVoucherCorrection = () => {
     return types[natureOfTransaction] || { label: natureOfTransaction, color: 'bg-gray-100 text-gray-800', description: 'Unknown' };
   };
 
+  const normalizeStr = (str) => str?.replace(/\u00A0/g, ' ') || '';
   const filteredVouchers = journalVouchers.filter(voucher => {
     const { searchTerm, natureOfTransaction, status } = searchFilters;
-    const matchesSearch = !searchTerm ||
-      voucher.journalNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      voucher.voucherNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      voucher.natureOfTransaction?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      voucher.journalDate?.includes(searchTerm) ||
-      voucher.nameOfTheScheme?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      voucher.nameOfTheWork?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      voucher.narration?.toLowerCase().includes(searchTerm.toLowerCase());
+    const s = normalizeStr(searchTerm).toLowerCase();
+    const matchesSearch = !s ||
+      normalizeStr(voucher.journalNo).toLowerCase().includes(s) ||
+      normalizeStr(voucher.voucherNumber).toLowerCase().includes(s) ||
+      normalizeStr(voucher.natureOfTransaction).toLowerCase().includes(s) ||
+      normalizeStr(voucher.journalDate).includes(s) ||
+      normalizeStr(voucher.nameOfTheScheme).toLowerCase().includes(s) ||
+      normalizeStr(voucher.nameOfTheWork).toLowerCase().includes(s) ||
+      normalizeStr(voucher.narration).toLowerCase().includes(s);
     const matchesNature = !natureOfTransaction || voucher.natureOfTransaction === natureOfTransaction;
     const matchesStatus = !status || (status === 'balanced' ? voucher.balanced : !voucher.balanced);
     return matchesSearch && matchesNature && matchesStatus;

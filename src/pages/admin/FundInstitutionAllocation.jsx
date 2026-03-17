@@ -287,17 +287,19 @@ const FundInstitutionAllocation = () => {
     });
   };
 
+  const normalizeStr = (str) => str?.replace(/\u00A0/g, ' ') || '';
   const filteredAllocations = allocations.filter(allocation => {
     const user = users.find(u =>
       String(u.id) === String(allocation.id) ||
       String(u.id) === String(allocation.userId)
     );
     const { searchTerm, status, user: userFilter, dateFrom, dateTo } = searchFilters;
-    const matchesSearch = !searchTerm ||
-                         (user?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (user?.username || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (user?.role || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (allocation.status || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const s = normalizeStr(searchTerm).toLowerCase();
+    const matchesSearch = !s ||
+                         normalizeStr(user?.name).toLowerCase().includes(s) ||
+                         normalizeStr(user?.username).toLowerCase().includes(s) ||
+                         normalizeStr(user?.role).toLowerCase().includes(s) ||
+                         normalizeStr(allocation.status).toLowerCase().includes(s);
     const matchesUserFilter = !userFilter ||
                              String(allocation.id) === String(userFilter) ||
                              String(allocation.userId) === String(userFilter);

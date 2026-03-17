@@ -205,9 +205,11 @@ const handleDelete = async (id) => {
   }
 };
   // Filter funds locally
+  const normalizeStr = (str) => str?.replace(/\u00A0/g, ' ') || '';
   const filteredFunds = funds.filter(fund => {
     const f = searchFilters;
-    const searchMatch = !f.searchTerm || fund.fundName?.toLowerCase().includes(f.searchTerm.toLowerCase());
+    const s = normalizeStr(f.searchTerm).toLowerCase();
+    const searchMatch = !s || normalizeStr(fund.fundName).toLowerCase().includes(s);
     const dateFromMatch = !f.dateFrom || fund.createdDate >= f.dateFrom;
     const dateToMatch = !f.dateTo || fund.createdDate <= f.dateTo;
     return searchMatch && dateFromMatch && dateToMatch;

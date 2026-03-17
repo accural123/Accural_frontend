@@ -8,6 +8,7 @@ import { useApiService } from "../../hooks/useApiService";
 import { ErrorDisplay } from '../../components/common/ErrorDisplay';
 import { ConfirmDialog, useConfirmDialog } from "../../components/common/Popup";
 import { useAuth } from '../../context/AuthContext';
+import Pagination from '../../components/common/Pagination';
 const EmployeeCreation = () => {
   const { dialogState, showConfirmDialog, closeDialog } = useConfirmDialog();
   const { getWorkspaceSelection } = useAuth();
@@ -29,6 +30,8 @@ const EmployeeCreation = () => {
   const [searchFilters, setSearchFilters] = useState({ searchTerm: '', designation: '', section: '', fundType: '' });
   const [submitLoading, setSubmitLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 20;
 
   const { executeApi, loading, error, clearError } = useApiService();
 
@@ -252,24 +255,29 @@ const handleDelete = async (id) => {
   //   }
   // };
 
+  const normalizeStr = (str) => str?.replace(/\u00A0/g, ' ') || '';
   const filteredEmployees = employees.filter(employee => {
     const f = searchFilters;
-    const searchMatch = !f.searchTerm ||
-      employee.empId?.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
-      employee.employeeName?.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
-      employee.designation?.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
-      employee.pfCpsNo?.toLowerCase().includes(f.searchTerm.toLowerCase());
+    const s = normalizeStr(f.searchTerm).toLowerCase();
+    const searchMatch = !s ||
+      normalizeStr(employee.empId).toLowerCase().includes(s) ||
+      normalizeStr(employee.employeeName).toLowerCase().includes(s) ||
+      normalizeStr(employee.designation).toLowerCase().includes(s) ||
+      normalizeStr(employee.pfCpsNo).toLowerCase().includes(s);
     const designationMatch = !f.designation || employee.designation?.toLowerCase().includes(f.designation.toLowerCase());
     const sectionMatch = !f.section || employee.section === f.section;
     const fundTypeMatch = !f.fundType || employee.fundType === f.fundType;
     return searchMatch && designationMatch && sectionMatch && fundTypeMatch;
   });
 
+  const totalPages = Math.ceil(filteredEmployees.length / PAGE_SIZE);
+  const paginatedEmployees = filteredEmployees.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
   const handleSelectAll = () => {
-    if (filteredEmployees.every(item => selectedIds.has(item.id))) {
+    if (paginatedEmployees.every(item => selectedIds.has(item.id))) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(filteredEmployees.map(item => item.id)));
+      setSelectedIds(new Set(paginatedEmployees.map(item => item.id)));
     }
   };
 
@@ -482,7 +490,7 @@ const handleDelete = async (id) => {
           title="Employee Records"
           totalRecords={filteredEmployees.length}
           searchFilters={searchFilters}
-          onFiltersChange={setSearchFilters}
+          onFiltersChange={(f) => { setSearchFilters(f); setCurrentPage(1); }}
           loading={loading}
           gradientFrom="from-indigo-500"
           gradientTo="to-purple-500"
@@ -548,7 +556,7 @@ const handleDelete = async (id) => {
                   <th className="px-4 py-3 w-10">
                     <input
                       type="checkbox"
-                      checked={filteredEmployees.length > 0 && filteredEmployees.every(item => selectedIds.has(item.id))}
+                      checked={paginatedEmployees.length > 0 && paginatedEmployees.every(item => selectedIds.has(item.id))}
                       onChange={handleSelectAll}
                       className="rounded"
                     />
@@ -563,7 +571,7 @@ const handleDelete = async (id) => {
                 </tr>
               </thead>
               <tbody className="bg-white/40 divide-y divide-slate-200">
-                {filteredEmployees.map((employee) => (
+                {paginatedEmployees.map((employee) => (
                   <tr key={employee.id} className="hover:bg-white/60 transition-colors">
                     <td className="px-4 py-3">
                       <input
@@ -601,6 +609,11 @@ const handleDelete = async (id) => {
               </div>
             )}
           </div>
+          {totalPages > 1 && (
+            <div className="px-6 py-4 border-t border-slate-200">
+              <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} pageSize={PAGE_SIZE} totalItems={filteredEmployees.length} />
+            </div>
+          )}
         </SearchableRecords>
       )}
       <ConfirmDialog

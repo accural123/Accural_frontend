@@ -954,15 +954,18 @@ const handleDelete = async (id) => {
     }
   };
 
+  const normalizeStr = (str) => str?.replace(/\u00A0/g, ' ') || '';
   const filteredLedgers = ledgers.filter(ledger => {
     const f = searchFilters;
-    const searchMatch = !f.searchTerm ||
-      ledger.ledgerCode?.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
-      ledger.ledgerName?.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
-      ledger.underGroup?.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
-      ledger.localBodyType?.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
-      ledger.bankName?.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
-      ledger.accountNo?.toLowerCase().includes(f.searchTerm.toLowerCase());
+    const s = normalizeStr(f.searchTerm).toLowerCase();
+    const searchMatch = !s ||
+      normalizeStr(ledger.ledgerCode).toLowerCase().includes(s) ||
+      normalizeStr(ledger.ledgerName).toLowerCase().includes(s) ||
+      normalizeStr(ledger.accountHoldersName).toLowerCase().includes(s) ||
+      normalizeStr(ledger.underGroup).toLowerCase().includes(s) ||
+      normalizeStr(ledger.bankName).toLowerCase().includes(s) ||
+      normalizeStr(ledger.accountNo).toLowerCase().includes(s) ||
+      normalizeStr(ledger.nameOfScheme).toLowerCase().includes(s);
     const underGroupMatch = !f.underGroup || ledger.underGroup?.toLowerCase().includes(f.underGroup.toLowerCase());
     const localBodyMatch = !f.localBodyType || ledger.localBodyType === f.localBodyType;
     return searchMatch && underGroupMatch && localBodyMatch;
@@ -1260,13 +1263,6 @@ const handleDelete = async (id) => {
           filterConfig={{ dateRange: false, amountRange: false, fromWhom: false, fundType: false, status: false, transactionMode: false }}
           customFilters={[
             { key: 'underGroup', label: 'Under Group', type: 'text', placeholder: 'Filter by group...' },
-            { key: 'localBodyType', label: 'Local Body Type', type: 'select', options: [
-              { value: '', label: 'All Types' },
-              { value: 'Municipality', label: 'Municipality' },
-              { value: 'Town Panchayat', label: 'Town Panchayat' },
-              { value: 'Village Panchayat', label: 'Village Panchayat' },
-              { value: 'Corporation', label: 'Corporation' },
-            ]},
           ]}
           totalItems={filteredLedgers.length}
         >

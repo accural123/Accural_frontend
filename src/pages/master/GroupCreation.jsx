@@ -10,6 +10,7 @@ import { groupService } from "../../services/realServices";
 import { useApiService } from "../../hooks/useApiService";
 import { ErrorDisplay } from '../../components/common/ErrorDisplay';
 import { VoiceInputField } from '../../components/common/VoiceInputField';
+import Pagination from '../../components/common/Pagination';
 
 import { ConfirmDialog, useConfirmDialog } from "../../components/common/Popup";
 import { useAuth } from '../../context/AuthContext';
@@ -35,6 +36,8 @@ const GroupCreation = () => {
   const [searchFilters, setSearchFilters] = useState({ searchTerm: '', mainGroup: '' });
   const [submitLoading, setSubmitLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 20;
 
   const { executeApi, loading, error, clearError } = useApiService();
 
@@ -355,26 +358,31 @@ const handleDelete = async (id) => {
   //   }
   // };
 
+  const normalizeStr = (str) => str?.replace(/\u00A0/g, ' ') || '';
   const filteredGroups = groups.filter(group => {
     const f = searchFilters;
     const name = getGroupName(group);
     const code = group.groupCode || '';
     const main = group.underMainGroup || '';
     const parent = group.underGroup || '';
-    const searchMatch = !f.searchTerm ||
-      code.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
-      name.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
-      main.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
-      parent.toLowerCase().includes(f.searchTerm.toLowerCase());
+    const s = normalizeStr(f.searchTerm).toLowerCase();
+    const searchMatch = !s ||
+      normalizeStr(code).toLowerCase().includes(s) ||
+      normalizeStr(name).toLowerCase().includes(s) ||
+      normalizeStr(main).toLowerCase().includes(s) ||
+      normalizeStr(parent).toLowerCase().includes(s);
     const mainGroupMatch = !f.mainGroup || group.underMainGroup === f.mainGroup || group.underGroup === f.mainGroup;
     return searchMatch && mainGroupMatch;
   });
 
+  const totalPages = Math.ceil(filteredGroups.length / PAGE_SIZE);
+  const paginatedGroups = filteredGroups.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
   const handleSelectAll = () => {
-    if (filteredGroups.every(item => selectedIds.has(item.id))) {
+    if (paginatedGroups.every(item => selectedIds.has(item.id))) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(filteredGroups.map(item => item.id)));
+      setSelectedIds(new Set(paginatedGroups.map(item => item.id)));
     }
   };
 
@@ -655,7 +663,7 @@ const handleDelete = async (id) => {
           title="Registered Groups"
           totalRecords={filteredGroups.length}
           searchFilters={searchFilters}
-          onFiltersChange={setSearchFilters}
+          onFiltersChange={(f) => { setSearchFilters(f); setCurrentPage(1); }}
           loading={loading}
           gradientFrom="from-blue-500"
           gradientTo="to-indigo-500"
@@ -706,7 +714,7 @@ const handleDelete = async (id) => {
                     <th className="px-4 py-3 w-10">
                       <input
                         type="checkbox"
-                        checked={filteredGroups.length > 0 && filteredGroups.every(item => selectedIds.has(item.id))}
+                        checked={paginatedGroups.length > 0 && paginatedGroups.every(item => selectedIds.has(item.id))}
                         onChange={handleSelectAll}
                         className="rounded"
                       />
@@ -722,7 +730,7 @@ const handleDelete = async (id) => {
                   </tr>
                 </thead>
                 <tbody className="bg-white/40 divide-y divide-slate-200">
-                  {filteredGroups.map((group) => (
+                  {paginatedGroups.map((group) => (
                     <tr key={group.id} className="hover:bg-white/60 transition-colors">
                       <td className="px-4 py-3">
                         <input
@@ -822,6 +830,11 @@ const handleDelete = async (id) => {
                 </button>
               </div>
             )}
+          {totalPages > 1 && (
+            <div className="px-6 py-4 border-t border-slate-200">
+              <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} pageSize={PAGE_SIZE} totalItems={filteredGroups.length} />
+            </div>
+          )}
         </SearchableRecords>
       )}
       <ConfirmDialog

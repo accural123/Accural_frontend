@@ -8,6 +8,7 @@ import { useApiService } from "../../hooks/useApiService";
 import { ErrorDisplay } from '../../components/common/ErrorDisplay';
 import { ConfirmDialog, useConfirmDialog } from "../../components/common/Popup";
 import { useAuth } from "../../context/AuthContext";
+import Pagination from '../../components/common/Pagination';
 const InstitutionCreation = () => {
   const { dialogState, showConfirmDialog, closeDialog } = useConfirmDialog();
   const [formData, setFormData] = useState({
@@ -39,6 +40,8 @@ const InstitutionCreation = () => {
   const [searchFilters, setSearchFilters] = useState({ searchTerm: '', state: '', localBodyType: '' });
   const [submitLoading, setSubmitLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 20;
 
   const { executeApi, loading, error, clearError } = useApiService();
   const { user, getWorkspaceSelection } = useAuth();
@@ -413,10 +416,10 @@ const handleDelete = async (id) => {
   // };
 
   const handleSelectAll = () => {
-    if (filteredInstitutions.every(item => selectedIds.has(item.id))) {
+    if (paginatedInstitutions.every(item => selectedIds.has(item.id))) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(filteredInstitutions.map(item => item.id)));
+      setSelectedIds(new Set(paginatedInstitutions.map(item => item.id)));
     }
   };
 
@@ -447,23 +450,28 @@ const handleDelete = async (id) => {
   };
 
   // Filter institutions locally
+  const normalizeStr = (str) => str?.replace(/\u00A0/g, ' ') || '';
   const filteredInstitutions = institutions.filter(inst => {
     const f = searchFilters;
-    const searchMatch = !f.searchTerm ||
-      inst.institutionName?.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
-      inst.mailingName?.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
-      inst.state?.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
-      inst.panNo?.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
-      inst.mobileNo?.includes(f.searchTerm) ||
-      inst.alternateMobileNo?.includes(f.searchTerm) ||
-      inst.telephone?.includes(f.searchTerm) ||
-      inst.email?.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
-      inst.gstNo?.toLowerCase().includes(f.searchTerm.toLowerCase()) ||
-      inst.institutionId?.toLowerCase().includes(f.searchTerm.toLowerCase());
+    const s = normalizeStr(f.searchTerm).toLowerCase();
+    const searchMatch = !s ||
+      normalizeStr(inst.institutionName).toLowerCase().includes(s) ||
+      normalizeStr(inst.mailingName).toLowerCase().includes(s) ||
+      normalizeStr(inst.state).toLowerCase().includes(s) ||
+      normalizeStr(inst.panNo).toLowerCase().includes(s) ||
+      normalizeStr(inst.mobileNo).includes(s) ||
+      normalizeStr(inst.alternateMobileNo).includes(s) ||
+      normalizeStr(inst.telephone).includes(s) ||
+      normalizeStr(inst.email).toLowerCase().includes(s) ||
+      normalizeStr(inst.gstNo).toLowerCase().includes(s) ||
+      normalizeStr(inst.institutionId).toLowerCase().includes(s);
     const stateMatch = !f.state || inst.state?.toLowerCase().includes(f.state.toLowerCase());
     const localBodyTypeMatch = !f.localBodyType || inst.localBodyType === f.localBodyType;
     return searchMatch && stateMatch && localBodyTypeMatch;
   });
+
+  const totalPages = Math.ceil(filteredInstitutions.length / PAGE_SIZE);
+  const paginatedInstitutions = filteredInstitutions.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   // Get local body type label for display
   const getLocalBodyTypeLabel = (value) => {
@@ -814,7 +822,7 @@ const handleDelete = async (id) => {
           title="Registered Institutions"
           totalRecords={filteredInstitutions.length}
           searchFilters={searchFilters}
-          onFiltersChange={setSearchFilters}
+          onFiltersChange={(f) => { setSearchFilters(f); setCurrentPage(1); }}
           loading={loading}
           gradientFrom="from-blue-500"
           gradientTo="to-cyan-500"
@@ -868,7 +876,7 @@ const handleDelete = async (id) => {
                   <th className="px-4 py-3 w-10">
                     <input
                       type="checkbox"
-                      checked={filteredInstitutions.length > 0 && filteredInstitutions.every(item => selectedIds.has(item.id))}
+                      checked={paginatedInstitutions.length > 0 && paginatedInstitutions.every(item => selectedIds.has(item.id))}
                       onChange={handleSelectAll}
                       className="rounded"
                     />
@@ -883,7 +891,7 @@ const handleDelete = async (id) => {
                 </tr>
               </thead>
               <tbody className="bg-white/40 divide-y divide-slate-200">
-                {filteredInstitutions.map((institution) => (
+                {paginatedInstitutions.map((institution) => (
                   <tr key={institution.id} className="hover:bg-white/60 transition-colors">
                     <td className="px-4 py-3">
                       <input
@@ -938,6 +946,11 @@ const handleDelete = async (id) => {
               </div>
             )}
           </div>
+          {totalPages > 1 && (
+            <div className="px-6 py-4 border-t border-slate-200">
+              <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} pageSize={PAGE_SIZE} totalItems={filteredInstitutions.length} />
+            </div>
+          )}
         </SearchableRecords>
       )}
       <ConfirmDialog
