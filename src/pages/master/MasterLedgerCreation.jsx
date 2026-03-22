@@ -46,7 +46,7 @@ const MasterLedgerCreation = () => {
 
   // Convert group options to SearchableDropdown format (subgroups only)
   const groupOptions = groups
-    .filter(g => !g.isMainGroup && g.underMainGroup)
+    .filter(g => g.isSubGroup === true)
     .map(g => ({
       value: g.groupName,
       label: g.groupCode ? `${g.groupName} (${g.groupCode})` : g.groupName,
