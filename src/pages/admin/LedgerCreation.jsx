@@ -625,12 +625,14 @@ const LedgerCreation = () => {
 
   const { executeApi, loading, error, clearError } = useApiService();
 
-  // Convert real groups to SearchableDropdown format
-  const groupOptions = groups.map(group => ({
-    value: group.groupName || group.name,
-    label: group.groupCode ? `${group.groupName || group.name} (${group.groupCode})` : (group.groupName || group.name),
-    description: group.underMainGroup || ''
-  }));
+  // Convert real groups to SearchableDropdown format (subgroups only)
+  const groupOptions = groups
+    .filter(group => !group.isMainGroup && group.underMainGroup)
+    .map(group => ({
+      value: group.groupName || group.name,
+      label: group.groupCode ? `${group.groupName || group.name} (${group.groupCode})` : (group.groupName || group.name),
+      description: group.underMainGroup || ''
+    }));
 
   // Fallback options if API is empty
   const fallbackGroupOptions = [

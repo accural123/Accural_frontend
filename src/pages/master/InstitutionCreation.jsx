@@ -17,6 +17,7 @@ const InstitutionCreation = () => {
     mailingName: '',
     address: '',
     state: '',
+    district: '',
     country: 'India',
     pincode: '',
     localBodyType: '',
@@ -622,6 +623,15 @@ const handleDelete = async (id) => {
                 placeholder="Enter state"
               />
               
+              <FormField
+                label="District"
+                name="district"
+                value={formData.district}
+                onChange={handleChange}
+                error={errors.district}
+                placeholder="Enter district"
+              />
+
               <FormField
                 label="Pincode"
                 name="pincode"

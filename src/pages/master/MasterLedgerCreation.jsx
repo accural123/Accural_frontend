@@ -44,12 +44,14 @@ const MasterLedgerCreation = () => {
 
   const { executeApi, loading, error, clearError } = useApiService();
 
-  // Convert group options to SearchableDropdown format (loaded dynamically from API)
-  const groupOptions = groups.map(g => ({
-    value: g.groupName,
-    label: g.groupCode ? `${g.groupName} (${g.groupCode})` : g.groupName,
-    description: g.underMainGroup ? `Main Group: ${g.underMainGroup}` : (g.description || ''),
-  }));
+  // Convert group options to SearchableDropdown format (subgroups only)
+  const groupOptions = groups
+    .filter(g => !g.isMainGroup && g.underMainGroup)
+    .map(g => ({
+      value: g.groupName,
+      label: g.groupCode ? `${g.groupName} (${g.groupCode})` : g.groupName,
+      description: g.underMainGroup ? `Main Group: ${g.underMainGroup}` : (g.description || ''),
+    }));
 
   // Local body type options
   const localBodyTypeOptions = [
