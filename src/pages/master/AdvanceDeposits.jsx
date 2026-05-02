@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import FinancialYearPicker from '../../components/common/FinancialYearPicker';
 import { FormField } from "../../components/common/FormField";
 import { DataTable } from "../../components/common/DataTable";
 import { ToastContainer } from "../../components/common/ToastContainer";
@@ -128,12 +129,6 @@ const AdvanceDeposits = ({
     { value: 'GJV', label: 'GJV - General Journal Voucher', description: 'General Journal Voucher' }
   ];
 
-  const financialYearOptions = [
-    { value: '2022-23', label: '2022-23', description: 'Financial Year 2022-23' },
-    { value: '2023-24', label: '2023-24', description: 'Financial Year 2023-24' },
-    { value: '2024-25', label: '2024-25', description: 'Financial Year 2024-25' },
-    { value: '2025-26', label: '2025-26', description: 'Financial Year 2025-26' }
-  ];
 
   const accountOptions = accounts.map(account => ({
     value: account.ledgerCode,
@@ -872,18 +867,12 @@ const AdvanceDeposits = ({
           <div className="p-6">
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {/* Financial Year Dropdown */}
-                <SearchableDropdown
-                  label="Financial Year"
-                  placeholder="Select Financial Year"
-                  searchPlaceholder="Search financial year..."
-                  options={financialYearOptions}
+                {/* Financial Year Picker */}
+                <FinancialYearPicker
                   value={formData.financialYear}
                   onChange={handleDropdownChange('financialYear')}
                   required
                   error={errors.financialYear}
-                  icon={Calendar}
-                  emptyMessage="No financial years available"
                 />
                 
                 {/* Ledger Code Dropdown - Conditionally rendered */}

@@ -1308,7 +1308,6 @@ const handleDelete = async (id) => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Group</th>
                   {/* <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Local Body</th> */}
                   {/* <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Opening Balance</th> */}
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Bank Details</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
@@ -1340,21 +1339,6 @@ const handleDelete = async (id) => {
                     {/* <td className="px-6 py-4">
                       <div className="text-sm text-slate-900">₹{parseFloat(ledger.openingBalance || 0).toFixed(2)}</div>
                     </td> */}
-                    <td className="px-6 py-4">
-                      {ledger.underGroup && (
-                        ledger.underGroup.toLowerCase().trim() === 'bank account' || 
-                        ledger.underGroup.toLowerCase().trim() === 'bank accounts' ||
-                        ledger.underGroup.toLowerCase().includes('bank')
-                      ) ? (
-                        <div>
-                          <div className="text-sm text-slate-900">{ledger.bankName}</div>
-                          <div className="text-sm text-slate-500">{ledger.accountNo}</div>
-                        </div>
-                      ) : (
-                        <span className="text-sm text-slate-500">N/A</span>
-                      )}
-                    </td>
-
                     <td className="px-6 py-4 text-sm font-medium space-x-2">
                       <button
                         onClick={() => handleEdit(ledger)}

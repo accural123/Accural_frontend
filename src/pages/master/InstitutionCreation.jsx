@@ -48,6 +48,47 @@ const InstitutionCreation = () => {
   const { user, getWorkspaceSelection } = useAuth();
   const userSession = getWorkspaceSelection();
 
+  const tamilNaduDistricts = [
+    { value: 'Ariyalur', label: 'Ariyalur' },
+    { value: 'Chengalpattu', label: 'Chengalpattu' },
+    { value: 'Chennai', label: 'Chennai' },
+    { value: 'Coimbatore', label: 'Coimbatore' },
+    { value: 'Cuddalore', label: 'Cuddalore' },
+    { value: 'Dharmapuri', label: 'Dharmapuri' },
+    { value: 'Dindigul', label: 'Dindigul' },
+    { value: 'Erode', label: 'Erode' },
+    { value: 'Kallakurichi', label: 'Kallakurichi' },
+    { value: 'Kanchipuram', label: 'Kanchipuram' },
+    { value: 'Kanyakumari', label: 'Kanyakumari' },
+    { value: 'Karur', label: 'Karur' },
+    { value: 'Krishnagiri', label: 'Krishnagiri' },
+    { value: 'Madurai', label: 'Madurai' },
+    { value: 'Mayiladuthurai', label: 'Mayiladuthurai' },
+    { value: 'Nagapattinam', label: 'Nagapattinam' },
+    { value: 'Namakkal', label: 'Namakkal' },
+    { value: 'Nilgiris', label: 'Nilgiris' },
+    { value: 'Perambalur', label: 'Perambalur' },
+    { value: 'Pudukkottai', label: 'Pudukkottai' },
+    { value: 'Ramanathapuram', label: 'Ramanathapuram' },
+    { value: 'Ranipet', label: 'Ranipet' },
+    { value: 'Salem', label: 'Salem' },
+    { value: 'Sivaganga', label: 'Sivaganga' },
+    { value: 'Tenkasi', label: 'Tenkasi' },
+    { value: 'Thanjavur', label: 'Thanjavur' },
+    { value: 'Theni', label: 'Theni' },
+    { value: 'Thoothukudi', label: 'Thoothukudi' },
+    { value: 'Tiruchirappalli', label: 'Tiruchirappalli' },
+    { value: 'Tirunelveli', label: 'Tirunelveli' },
+    { value: 'Tirupathur', label: 'Tirupathur' },
+    { value: 'Tiruppur', label: 'Tiruppur' },
+    { value: 'Tiruvallur', label: 'Tiruvallur' },
+    { value: 'Tiruvannamalai', label: 'Tiruvannamalai' },
+    { value: 'Tiruvarur', label: 'Tiruvarur' },
+    { value: 'Vellore', label: 'Vellore' },
+    { value: 'Viluppuram', label: 'Viluppuram' },
+    { value: 'Virudhunagar', label: 'Virudhunagar' },
+  ];
+
   // Convert local body type options to SearchableDropdown format
   const localBodyTypeOptions = [
     { 
@@ -589,15 +630,6 @@ const handleDelete = async (id) => {
                 placeholder="Enter mailing name"
               />
 
-              <FormField
-                label="Country"
-                name="country"
-                value={formData.country}
-                onChange={handleChange}
-                required
-                error={errors.country}
-                placeholder="Enter country"
-              />
               
               <div className="lg:col-span-3">
                 <FormField
@@ -612,7 +644,29 @@ const handleDelete = async (id) => {
                   placeholder="Enter complete address"
                 />
               </div>
-              
+              <SearchableDropdown
+                label="District"
+                placeholder="Select District"
+                searchPlaceholder="Search districts..."
+                options={tamilNaduDistricts}
+                value={formData.district}
+                onChange={handleDropdownChange('district')}
+                error={errors.district}
+                icon={MapPin}
+                emptyMessage="No districts found"
+                maxHeight="250px"
+              />
+
+                  <FormField
+                label="Pincode"
+                name="pincode"
+                value={formData.pincode}
+                onChange={handleChange}
+                required
+                error={errors.pincode}
+                maxLength={6}
+                placeholder="6-digit pincode"
+              /> 
               <FormField
                 label="State"
                 name="state"
@@ -623,26 +677,19 @@ const handleDelete = async (id) => {
                 placeholder="Enter state"
               />
               
-              <FormField
-                label="District"
-                name="district"
-                value={formData.district}
-                onChange={handleChange}
-                error={errors.district}
-                placeholder="Enter district"
-              />
+          
+
+              
 
               <FormField
-                label="Pincode"
-                name="pincode"
-                value={formData.pincode}
+                label="Country"
+                name="country"
+                value={formData.country}
                 onChange={handleChange}
                 required
-                error={errors.pincode}
-                maxLength={6}
-                placeholder="6-digit pincode"
+                error={errors.country}
+                placeholder="Enter country"
               />
-
               {/* Local Body Type Field with SearchableDropdown */}
               <SearchableDropdown
                 label="Local Body Type"
@@ -767,14 +814,14 @@ const handleDelete = async (id) => {
                 placeholder="Enter email address"
               />
 
-              {/* Legal Information */}
-              {/* <div className="lg:col-span-3 mt-6">
+              {/* Financial Information */}
+              <div className="lg:col-span-3 mt-6">
                 <h3 className="text-lg font-semibold text-slate-700 mb-4 flex items-center">
-                  <FileText className="h-5 w-5 mr-2 text-green-500" />
-                  Legal Information
+                  <FileText className="h-5 w-5 mr-2 text-purple-500" />
+                  Financial Information
                 </h3>
-              </div> */}
-              
+              </div>
+
               <FormField
                 label="PAN Number"
                 name="panNo"
@@ -786,7 +833,7 @@ const handleDelete = async (id) => {
                 maxLength={10}
                 icon={FileText}
               />
-              
+
               <FormField
                 label="GST Number"
                 name="gstNo"
@@ -883,7 +930,7 @@ const handleDelete = async (id) => {
             <table className="w-full">
               <thead className="bg-slate-50">
                 <tr>
-                  <th className="px-4 py-3 w-10">
+                  <th className="px-4 py-3 w-10" rowSpan={2}>
                     <input
                       type="checkbox"
                       checked={paginatedInstitutions.length > 0 && paginatedInstitutions.every(item => selectedIds.has(item.id))}
@@ -891,13 +938,16 @@ const handleDelete = async (id) => {
                       className="rounded"
                     />
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Institution</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Location</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Local Body</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Contact</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Pan No</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Gst No</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider" rowSpan={2}>Institution</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider" rowSpan={2}>Location</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider" rowSpan={2}>Local Body</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider" rowSpan={2}>Contact</th>
+                  <th className="px-6 py-3 text-center text-xs font-semibold text-purple-600 uppercase tracking-wider border-b border-purple-200 bg-purple-50" colSpan={2}>Financial</th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider" rowSpan={2}>Actions</th>
+                </tr>
+                <tr>
+                  <th className="px-6 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider bg-slate-50">Pan No</th>
+                  <th className="px-6 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider bg-slate-50">Gst No</th>
                 </tr>
               </thead>
               <tbody className="bg-white/40 divide-y divide-slate-200">
@@ -934,13 +984,15 @@ const handleDelete = async (id) => {
                     <td className="px-6 py-4">
                       <div className="text-sm text-slate-500">{institution.gstNo || 'N/A'}</div>
                     </td>
-                    <td className="px-6 py-4 text-sm font-medium space-x-2">
-                      <button onClick={() => handleEdit(institution)} className="text-blue-600 hover:text-blue-900 p-1 rounded" title="Edit">
-                        <Edit className="h-4 w-4" />
-                      </button>
-                      <button onClick={() => handleDelete(institution.id)} className="text-red-600 hover:text-red-900 p-1 rounded" title="Delete">
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                    <td className="px-6 py-4 text-sm font-medium">
+                      <div className="flex items-center justify-center gap-2">
+                        <button onClick={() => handleEdit(institution)} className="text-blue-600 hover:text-blue-900 p-1.5 rounded hover:bg-blue-50 transition-colors" title="Edit">
+                          <Edit className="h-4 w-4" />
+                        </button>
+                        <button onClick={() => handleDelete(institution.id)} className="text-red-600 hover:text-red-900 p-1.5 rounded hover:bg-red-50 transition-colors" title="Delete">
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

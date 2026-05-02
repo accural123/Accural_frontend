@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import FinancialYearPicker from '../../components/common/FinancialYearPicker';
 import { CreditCard, Receipt, Calendar, AlertCircle, CheckCircle, Plus, Save, RefreshCw, Eye, FileText, Search, DollarSign, TrendingUp, Hash, Building, User, Trash2, Edit3, Wallet } from 'lucide-react';
 
 // Import hooks
@@ -973,17 +974,11 @@ const PayableDetails = () => {
                 />
 
                 {/* Financial Year */}
-                <SearchableDropdown
-                  label="Financial Year"
-                  placeholder="Select Financial Year"
-                  searchPlaceholder="Search financial year..."
-                  options={financialYearOptions}
+                <FinancialYearPicker
                   value={formData.financialYear}
-                  onChange={(e) => handleChange({ target: { name: 'financialYear', value: e.target.value } })}
+                  onChange={(fy) => handleChange({ target: { name: 'financialYear', value: fy } })}
                   required
                   error={errors.financialYear}
-                  icon={Calendar}
-                  emptyMessage="No financial years available"
                 />
                 
                 {/* Ledger Code */}

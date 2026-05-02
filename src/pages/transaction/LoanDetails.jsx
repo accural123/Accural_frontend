@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import FinancialYearPicker from '../../components/common/FinancialYearPicker';
 import { CreditCard, DollarSign, Calendar, FileText, Building, Save, Plus, Edit, Trash2, Eye, Percent, Clock, AlertCircle } from 'lucide-react';
 import { FormField } from "../../components/common/FormField";
 import SearchableDropdown from "../../components/common/SearchableDropdown";
@@ -461,17 +462,11 @@ const handleDelete = async (id) => {
                 placeholder="Enter file number"
               />
 
-              <SearchableDropdown
-                label="Financial Year"
-                placeholder="Select Financial Year"
-                searchPlaceholder="Search financial years..."
-                options={financialYearOptions}
+              <FinancialYearPicker
                 value={formData.financialYear}
                 onChange={handleDropdownChange('financialYear')}
                 required
                 error={errors.financialYear}
-                icon={Calendar}
-                emptyMessage="No financial years available"
               />
 
               <SearchableDropdown

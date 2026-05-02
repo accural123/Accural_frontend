@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import FinancialYearPicker from '../../components/common/FinancialYearPicker';
 import { Card } from "../../components/common/Card";
 import { FormField } from "../../components/common/FormField";
 import { SubmitButton } from "../../components/common/SubmitButton";
@@ -738,18 +739,12 @@ const handleDelete = async (id) => {
                     placeholder="Enter assessment number"
                   />
                   
-                  {/* Financial Year with SearchableDropdown */}
-                  <SearchableDropdown
-                    label="Financial Year"
-                    placeholder="Select Financial Year"
-                    searchPlaceholder="Search financial year..."
-                    options={financialYearOptions}
+                  {/* Financial Year */}
+                  <FinancialYearPicker
                     value={formData.financialYear}
                     onChange={handleDropdownChange('financialYear')}
                     required
                     error={errors.financialYear}
-                    icon={Calendar}
-                    emptyMessage="No financial years available"
                   />
                   
                   {/* Ledger Code with SearchableDropdown */}
