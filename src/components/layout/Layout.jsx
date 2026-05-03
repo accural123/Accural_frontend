@@ -649,9 +649,22 @@ const Layout = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
   const [openMenus, setOpenMenus] = useState({});
   const { dialogState, showConfirmDialog, closeDialog } = useConfirmDialog();
   const userSession = getWorkspaceSelection();
+
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      setSidebarOpen(!mobile);
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Memoize menu items to prevent infinite re-renders
   const menuItems = useMemo(() => {
@@ -855,6 +868,9 @@ const Layout = ({ children }) => {
 
   const handleNavigation = (path) => {
     navigate(path);
+    if (isMobile) {
+      setSidebarOpen(false);
+    }
   };
 
   // const handleLogout = () => {
@@ -915,11 +931,13 @@ const Layout = ({ children }) => {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       {/* Header */}
       <header className="bg-white/80 backdrop-blur-xl border-b border-slate-200/60 shadow-sm sticky top-0 z-50">
-        <div className="flex items-center justify-between px-6 py-4">
+        <div className="flex items-center justify-between px-3 py-4 sm:px-6">
           <div className="flex items-center space-x-4">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
               className="p-2 rounded-lg hover:bg-slate-100 transition-colors duration-200"
+              aria-label={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
+              aria-expanded={sidebarOpen}
               title="Toggle Sidebar"
             >
               <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -932,13 +950,13 @@ const Layout = ({ children }) => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                 </svg>
               </div>
-              <h1 className="text-xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
+              <h1 className="text-base font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent sm:text-xl">
                 Accrual Accounting
               </h1>
             </div>
           </div>
           
-          <div className="flex items-center space-x-6">
+          <div className="flex items-center space-x-3 sm:space-x-6">
             {/* Workspace Information */}
             <div className="hidden md:block text-right">
               <div className="text-sm text-slate-600 font-medium">{workspaceInfo.institution}</div>
@@ -959,30 +977,63 @@ const Layout = ({ children }) => {
             
             <button
               onClick={handleLogout}
-              className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 transform hover:scale-105 shadow-lg"
+              className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 transform hover:scale-105 shadow-lg sm:px-4"
               title="Logout"
             >
               <div className="flex items-center space-x-2">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                 </svg>
-                <span>Logout</span>
+                <span className="hidden sm:inline">Logout</span>
               </div>
             </button>
           </div>
         </div>
       </header>
 
+      {isMobile && sidebarOpen && (
+        <button
+          type="button"
+          className="fixed inset-x-0 bottom-0 top-[73px] z-30 bg-slate-900/40 backdrop-blur-sm md:hidden"
+          onClick={() => setSidebarOpen(false)}
+          aria-label="Close sidebar backdrop"
+        />
+      )}
+
       <div className="flex">
         {/* Sidebar */}
-        <aside className={`${sidebarOpen ? 'w-80' : 'w-0'} transition-all duration-300 overflow-hidden bg-white/80 backdrop-blur-xl border-r border-slate-200/60 shadow-lg`}>
+        <aside
+          className={`${
+            isMobile
+              ? `fixed bottom-0 left-0 top-[73px] z-40 w-80 max-w-[85vw] transform ${
+                  sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+                }`
+              : `${sidebarOpen ? 'w-80' : 'w-0'}`
+          } transition-all duration-300 overflow-hidden bg-white/95 backdrop-blur-xl border-r border-slate-200/60 shadow-lg`}
+        >
           <div className="p-4 h-[calc(100vh-80px)] overflow-y-auto">
+            {isMobile && (
+              <div className="mb-4 flex items-center justify-between border-b border-slate-200 pb-3">
+                <h2 className="text-base font-semibold text-slate-800">Menu</h2>
+                <button
+                  type="button"
+                  onClick={() => setSidebarOpen(false)}
+                  className="rounded-lg p-2 text-slate-600 transition-colors hover:bg-slate-100"
+                  aria-label="Close sidebar"
+                  title="Close Sidebar"
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            )}
             {/* Workspace Summary (for non-admin users) */}
             {user?.role !== 'Administrator' && userSession?.selectedFunds && (
               <div className="mb-4 p-3 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg">
                 <div className="text-xs font-medium text-indigo-800 mb-1">Available Funds</div>
                 <div className="space-y-1">
-                  {userSession.selectedFunds.slice(0, 2).map((fund, index) => (
+                  {userSession.selectedFunds.slice(0, 2).map((fund) => (
                     <div key={fund.id} className="text-xs text-indigo-600 truncate">
                       • {fund.fundName}
                     </div>
@@ -1072,7 +1123,7 @@ const Layout = ({ children }) => {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 p-6 min-h-[calc(100vh-80px)]">
+        <main className="min-h-[calc(100vh-80px)] min-w-0 flex-1 p-4 md:p-6">
           <div className="max-w-7xl mx-auto">
             {children || (
               <div className="bg-white/60 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200/60 p-8">
