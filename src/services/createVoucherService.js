@@ -17,4 +17,8 @@ export const createVoucherService = (endpoint) => ({
   delete: async (id) => {
     return apiClient.delete(`${endpoint}/${id}`);
   },
+
+  downloadPdf: async (id, exportPath, fallbackFilename) => {
+    return apiClient.downloadFile(`${endpoint}/${id}${exportPath}`, fallbackFilename);
+  },
 });

@@ -122,6 +122,64 @@ class ApiClient {
       method: 'DELETE',
     });
   }
+
+  async downloadFile(endpoint, fallbackFilename = 'download') {
+    const url = `${this.baseURL}${endpoint}`;
+    const headers = {};
+
+    const token = localStorage.getItem('authToken');
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    try {
+      const userSessionStr = localStorage.getItem('userSession');
+      if (userSessionStr) {
+        const sessionData = JSON.parse(userSessionStr);
+        if (sessionData?.selectedInstitution?.id) {
+          headers['X-Institution-Id'] = sessionData.selectedInstitution.id;
+        }
+        if (sessionData?.selectedFunds?.length) {
+          headers['X-Fund-Ids'] = sessionData.selectedFunds.map(f => f.id).join(',');
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to parse user session for headers:', error);
+    }
+
+    try {
+      const response = await fetch(url, { method: 'GET', headers });
+
+      if (!response.ok) {
+        let message = `Download failed (${response.status})`;
+        try {
+          const errBody = await response.json();
+          message = errBody.message || errBody.error || message;
+        } catch (_) { /* not json */ }
+        if (response.status === 401) {
+          localStorage.removeItem('authToken');
+        }
+        return { success: false, message, status: response.status };
+      }
+
+      const disposition = response.headers.get('Content-Disposition') || '';
+      const match = disposition.match(/filename\*?=(?:UTF-8'')?["']?([^"';]+)["']?/i);
+      const filename = (match && decodeURIComponent(match[1])) || fallbackFilename;
+
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+
+      return { success: true, filename, message: 'Download started' };
+    } catch (error) {
+      console.error('Download failed:', error);
+      return { success: false, message: error.message || 'Network error' };
+    }
+  }
 }
 
 const apiClient = new ApiClient();

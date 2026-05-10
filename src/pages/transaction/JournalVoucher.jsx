@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { BookOpen, Calendar, FileText, DollarSign, Banknote, User, Wallet, Building, Plus, Trash2, Check, Edit3, CheckCircle, AlertCircle, Filter, X, ChevronDown, ChevronUp, Search, TrendingUp } from 'lucide-react';
+import { BookOpen, Calendar, FileText, DollarSign, Banknote, User, Wallet, Building, Plus, Trash2, Check, Edit3, CheckCircle, AlertCircle, Filter, X, ChevronDown, ChevronUp, Search, TrendingUp, Download } from 'lucide-react';
 
 // Import hooks
 import { useToast } from '../../hooks/useToast';
@@ -755,7 +755,7 @@ const handleDeleteVoucher = async (voucher) => {
     cancelText: 'Cancel',
     type: 'error'
   });
-  
+
   if (confirmed) {
     const result = await executeApi(journalVoucherService.delete, voucher.id);
     if (result.success) {
@@ -764,6 +764,24 @@ const handleDeleteVoucher = async (voucher) => {
     } else {
       showToast('Failed to delete voucher!', 'error');
     }
+  }
+};
+
+const isCjvVoucher = (voucher) => {
+  const type = voucher.journalType || voucher.natureOfTransaction || voucher.voucherType || '';
+  return String(type).toUpperCase() === 'CJV';
+};
+
+const handleDownloadPdf = async (voucher) => {
+  const result = await journalVoucherService.downloadPdf(
+    voucher.id,
+    '/export/cjv-pdf',
+    `CJV_${voucher.journalNo || voucher.id}.pdf`
+  );
+  if (result.success) {
+    showToast('PDF downloaded', 'success');
+  } else {
+    showToast(result.message || 'Failed to download PDF', 'error');
   }
 };
 
@@ -985,6 +1003,15 @@ const handleDeleteVoucher = async (voucher) => {
                         >
                           <Edit3 className="h-4 w-4" />
                         </button>
+                        {isCjvVoucher(voucher) && (
+                          <button
+                            onClick={() => handleDownloadPdf(voucher)}
+                            className="p-2 text-emerald-600 hover:bg-emerald-100 rounded-lg transition-colors"
+                            title="Download PDF"
+                          >
+                            <Download className="h-4 w-4" />
+                          </button>
+                        )}
                         <button
                           onClick={() => handleDeleteVoucher(voucher)}
                           className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"

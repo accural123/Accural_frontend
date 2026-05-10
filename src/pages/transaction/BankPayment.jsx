@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { ArrowDownCircle, Calendar, FileText, DollarSign, Banknote, User, Wallet, CreditCard, Plus, Trash2, Check, Edit3, CheckCircle, AlertCircle, Filter, X, ChevronDown, ChevronUp, Search, Building2 } from 'lucide-react';
+import { ArrowDownCircle, Calendar, FileText, DollarSign, Banknote, User, Wallet, CreditCard, Plus, Trash2, Check, Edit3, CheckCircle, AlertCircle, Filter, X, ChevronDown, ChevronUp, Search, Building2, Download } from 'lucide-react';
 
 // Import hooks
 import { useToast } from '../../hooks/useToast';
@@ -367,6 +367,19 @@ const handleSubmit = async () => {
     } else {
       showToast('Failed to delete voucher!', 'error');
     }
+  }
+};
+
+const handleDownloadPdf = async (voucher) => {
+  const result = await bankPaymentService.downloadPdf(
+    voucher.id,
+    '/export/bpv-pdf',
+    `BPV_${voucher.bpvNo || voucher.id}.pdf`
+  );
+  if (result.success) {
+    showToast('PDF downloaded', 'success');
+  } else {
+    showToast(result.message || 'Failed to download PDF', 'error');
   }
 };
 
@@ -787,6 +800,13 @@ const handleSubmit = async () => {
                           title="Edit Voucher"
                         >
                           <Edit3 className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDownloadPdf(voucher)}
+                          className="p-2 text-emerald-600 hover:bg-emerald-100 rounded-lg transition-colors"
+                          title="Download PDF"
+                        >
+                          <Download className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => handleDeleteVoucher(voucher)}
