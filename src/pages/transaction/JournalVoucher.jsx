@@ -1167,6 +1167,15 @@ const handleDownloadPdf = async (voucher) => {
           >
             <Edit3 className="h-4 w-4" />
           </button>
+          {jType === 'CJV' && (
+            <button
+              onClick={() => handleDownloadPdf(voucher)}
+              className="p-2 text-emerald-600 hover:bg-emerald-100 rounded-lg transition-colors"
+              title="Download PDF"
+            >
+              <Download className="h-4 w-4" />
+            </button>
+          )}
           <button
             onClick={() => handleDeleteVoucher(voucher)}
             className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
